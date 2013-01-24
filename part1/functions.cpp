@@ -3,4 +3,4 @@
 functions::functions()
 {
 }
-//morten er teit
+//morten er tøff
