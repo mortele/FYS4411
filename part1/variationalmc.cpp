@@ -1,5 +1,5 @@
 #include "variationalmc.h"
 
-VariationalMC::VariationalMC()
-{
+VariationalMC::VariationalMC() {
 }
+

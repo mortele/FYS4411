@@ -5,10 +5,13 @@ class VariationalMC {
     private:
         double h;
         double h2;
-        double
+        double alph;
+        double beta;
+        double Z;
 
     public:
-        VariationalMC();
+        VariationalMC(double, double, double, double, double);
+
 };
 
 #endif // VARIATIONALMC_H
