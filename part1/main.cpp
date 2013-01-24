@@ -5,6 +5,7 @@
 #include <time.h>
 
 #include "lib.cpp"
+#include "functions.cpp"
 
 using namespace std;
 

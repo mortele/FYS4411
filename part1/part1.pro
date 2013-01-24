@@ -4,10 +4,12 @@ CONFIG -= app_bundle
 CONFIG -= qt
 
 SOURCES += main.cpp \
-    functions.cpp
+    functions.cpp \
+    variationalmc.cpp
 
 HEADERS += \
-    functions.h
+    functions.h \
+    variationalmc.h
 
 HEADERS +=
 
