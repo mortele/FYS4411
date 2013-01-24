@@ -6,9 +6,9 @@ using namespace std;
 //calculates the wavefunction value at a point
 double psi(double *coordinates)
 {
-    r12 = sqrt((x-x2)*(x-x2)+(y-y2)*(y-y2)+(z-z2)*(z-z2));
+    r12 = sqrt((coordinates[0]-coordinates[3])*(coordinates[0]-coordinates[3])+(coordinates[1]-coordinates[4])*(coordinates[1]-coordinates[4])+(coordinates[2]-coordinates[5])*(coordinates[2]-coordinates[5]));
     //psi = exp(-*alph(r1+r2)*exp((r12)/(2*(1+beta*r12))));
-    return exp(-alph(sqrt(x*x+y*y+z*z)+sqrt(x2*x2+y2*y2+z2*z2))*exp((r12)/((1+beta*r12))));
+    return exp(-alph(sqrt(coordinates[0]*coordinates[0]+coordinates[1]*coordinates[1]+coordinates[2]*coordinates[2])+sqrt(coordinates[3]*coordinates[3]+coordinates[4]*coordinates[4]+coordinates[5]*coordinates[5]))*exp((r12)/((1+beta*r12))));
 }
 
 
@@ -36,6 +36,7 @@ double EL(double *coordinates,
 
 }
 
+// calculates the double derivative
 double derivative(double psil, double psi,double psih) {
     return (psil -2*psi + psih)/h2;
 
