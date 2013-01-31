@@ -23,9 +23,10 @@ class VariationalMC {
         double  stepSize;
 
         double computePsi(const mat &);
-        double computeEnergy(const mat &);
+        double computeEnergy(mat &, mat &, double);
         double computeDoubleDerivative(double, double, double);
         void   updateRmatrix(const mat &, mat &);
+        void   updateForDerivative(mat &, const mat &, int );
 
     public:
         VariationalMC();

@@ -12,15 +12,15 @@ using namespace arma;
 VariationalMC::VariationalMC() :
     nParticles  (2),
     nDimensions (3),
-    nCycles     (50),
-    N       (200),
+    nCycles     (200),
+    N       (2000000),
     idum    (10),
     charge  (2.0),
     h       (0.001),
-    h2      (1000000),
+    h2      (0.000001),
     alph    (0.5*charge),
-    beta    (20.0),
-    Z       (20.0),
+    beta    (1.0),
+    Z       (2.0),
     stepSize(1.0) {
 }
 
@@ -29,6 +29,9 @@ void VariationalMC::runMetropolis() {
 
     mat coordinatesNew = zeros<mat>(nParticles, nDimensions);
     mat coordinatesOld = zeros<mat>(nParticles, nDimensions);
+    mat Rnew           = zeros<mat>(nParticles, nDimensions);   // Matrix of distances and magnitudes.
+    mat Rold           = zeros<mat>(nParticles, nDimensions);
+
 
     double newWaveFunction = 0.0;
     double oldWaveFunction = 0.0;
@@ -39,6 +42,7 @@ void VariationalMC::runMetropolis() {
     double energy2Sum      = 0.0;
 
 
+
     // Fill coordinates arrays with random values.
     for (int i = 0; i < nParticles; i++) {
         for (int j = 0; j < nDimensions; j++) {
@@ -46,8 +50,12 @@ void VariationalMC::runMetropolis() {
         }
     }
 
+    // Updates distances and magnitudes in this initial state.
+    updateRmatrix(coordinatesNew, Rnew);
+    updateRmatrix(coordinatesOld, Rold);
+
     // Compute the wave function in this initial state.
-    oldWaveFunction = computePsi(coordinatesNew);
+    oldWaveFunction = computePsi(Rnew);
 
     // Metropolis loop.
     for (int k = 0; k < nCycles; k++) {
@@ -60,14 +68,16 @@ void VariationalMC::runMetropolis() {
         }
 
         // Compute the wavefunction in this new state.
-        newWaveFunction = computePsi(coordinatesNew);
+        updateRmatrix(coordinatesNew, Rnew);
+        newWaveFunction = computePsi(Rnew);
 
         // Check if the suggested move is accepted.
         if (1==1) {
             coordinatesOld = coordinatesNew;
 
             // Energy changes from previous state.
-            energy = computeEnergy(coordinatesNew);
+            energy = computeEnergy(Rnew, coordinatesNew, newWaveFunction);
+
         } else {
             coordinatesNew = coordinatesOld;
 
@@ -90,63 +100,73 @@ void VariationalMC::runMetropolis() {
 
 
 /* Computes the wavefunction in a state defined by position matrix r. */
-double VariationalMC::computePsi(const mat &r) {
+double VariationalMC::computePsi(const mat &R) {
 
-    double r_ij, r_ii, r_jj;
     double returnVal = 0.0;
 
     for (int i = 0; i < nParticles; i++) {
-
-        // Compute magnitude of r(i,:) position vector.
-        r_ii = 0.0;
-        for (int k = 0; k < nDimensions; k ++) {
-            r_ii += r(i,k) * r(i,k);
+        for (int j = (i + 1); j < nParticles; j++) {
+            returnVal += (1 / R(i,j)) * exp(-alph * (R(i,i) + R(j,j))) * (exp(R(i,j)) / (1 + beta * R(i,j)));
         }
-        r_ii = sqrt(r_ii);
-
-            r_jj = r_ij = 0.0;
-            for (int j = (i + 1); j < nParticles; j++) {
-
-                // Compute magnitude of r(i,:) - r(j,:) position vector.
-                r_ij = 0.0;
-                for (int k = 0; k < nDimensions; k++) {
-                    r_ij += (r(i,k) - r(j,k)) * (r(i,k) - r(j,k));
-                }
-                r_ij = sqrt(r_ij);
-
-                // Compute magnitude of r(j,:) position vector.
-                r_jj = 0.0;
-                for (int k = 0; k < nDimensions; k ++) {
-                    r_jj += r(j,k) * r(j,k);
-                }
-                r_jj = sqrt(r_jj);
-
-                returnVal += (1 / r_ij) * exp(-alph * (r_ii + r_jj)) * (exp(r_ij) / (1 + beta * r_ij));
-            }
-        }
-
+    }
     return returnVal;
-
-    // Pseudo-code outline of function:
-    //
-    //    for i=0..nParticles
-    //        compute r_ii
-    //
-    //            for j = i+1..nParticles
-    //                compute r_ij, and
-    //                compute r_jj
-    //
-    //                compute contribution to wavefunction from interaction of particles i,j
-    //
-    //    return sum of all contributions to wavefunction
 }
 
 
 
 
 /* Computes the energy of a state defined by position matrix r. */
-double VariationalMC::computeEnergy(const mat &r) {
-    return r(1,0);
+double VariationalMC::computeEnergy(mat &R, mat &r, double psi)
+{
+    double r12 = R(0,1);
+    double r1 = R(0,0);
+    double r2 = R(1,1);
+    double E1 = (-Z*(1/r1 +1/r2) +1/r12);
+    double E2 = 0;
+
+    /*
+                              for(int i=0; i< nDimensions*nParticles;i++){
+                                  coordinates[i]-=h;
+                                  psil = psi(coordinates);
+                                  coordinates[i]+=2*h;
+                                  psih = psi(coordinates);
+                                  coordinates[i]-=h;
+                                  E2-=derivative(psil, psi,psih);
+                              }
+                              */
+
+    vec oldR(nParticles);
+    double psil, psih;
+
+    for(int i = 0; i<nParticles;i++){
+        r1 = R(i,0);
+
+        for(int k=0; k<i; k++){
+            oldR(k) = R(i,k); //R is the matrix of distances
+        }
+
+
+        for(int k = i + 1; k < nParticles; k++) { // nParticles
+            oldR(k) = R(i,k);
+        }
+
+        for(int j = 0; j<nDimensions;j++){
+            r(i,j)-=h; //r is the array of coordinates
+
+            updateForDerivative(R,r, i);
+            psil = computePsi(R);
+
+            r(i,j)+=2*h;
+            updateForDerivative(R, r, i);
+            psih = computePsi(R);
+            r(i,j)-=h;
+            E2-=computeDoubleDerivative(psil, psi,psih);
+        }
+
+    }
+
+    return E2/psi +E1;
+
 }
 
 /* Computes a numerical approximation to the double derivative of psi. */
@@ -160,28 +180,21 @@ void VariationalMC::updateRmatrix(const mat &r, mat &R) {
     for (int i = 0; i < nParticles; i++) {
 
         // Compute magnitude of r(i,:) position vector.
-        R(i,i) = 0.0; // = r_ii
+        R(i,i) = 0.0;
         for (int k = 0; k < nDimensions; k ++) {
-            R(i,i) += r(i,k) * r(i,k); // = r_ii
+            R(i,i) += r(i,k) * r(i,k);
         }
         R(i,i) = sqrt(R(i,i));
 
-        R(j,j) = R(i,j) = 0.0;
         for (int j = (i + 1); j < nParticles; j++) {
+            R(j,j) = R(i,j) = 0.0;
 
             // Compute magnitude of r(i,:) - r(j,:) position vector.
-            r_ij = 0.0;
+            R(i,j) = 0.0;
             for (int k = 0; k < nDimensions; k++) {
-                r_ij += (r(i,k) - r(j,k)) * (r(i,k) - r(j,k));
+                R(i,j) += (r(i,k) - r(j,k)) * (r(i,k) - r(j,k));
             }
-            r_ij = sqrt(r_ij);
-
-            // Compute magnitude of r(j,:) position vector.
-            r_jj = 0.0;
-            for (int k = 0; k < nDimensions; k ++) {
-                r_jj += r(j,k) * r(j,k);
-            }
-            r_jj = sqrt(r_jj);
+            R(i,j) = sqrt(R(i,j));
         }
     }
 
@@ -194,4 +207,32 @@ void VariationalMC::updateRmatrix(const mat &r, mat &R) {
     //                compute R_ij
 }
 
+
+
+void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
+    vec dx(nDimensions);
+    double dxx;
+
+    for(int k=0; k<i; k++) {
+        for(int l =0;l<nDimensions;l++){
+            dxx =r[l+i*nDimensions]-r[l+k*nDimensions];
+            dx(l) = dxx*dxx;
+        }
+
+        R(i,k) = sqrt(sum(dx)); //R is the matrix of distances
+    }
+    for(int k=i+1;k<nParticles;k++){
+        for(int l =0;l<nDimensions;l++){
+            dxx =r[l+i*nDimensions]-r[l+k*nDimensions];
+            dx(l) = dxx*dxx;
+        }
+
+        R(i,k) = sqrt(sum(dx)); //R is the matrix of distances
+    }
+    for(int l =0;l<nDimensions;l++){
+        dxx =r[l+i*nDimensions]*r[l+i*nDimensions];
+        dx(l) = dxx*dxx;
+    }
+    R(i,0) = sqrt(sum(dx));
+}
 
