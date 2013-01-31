@@ -1,4 +1,6 @@
+
 #include "functions.h"
+#include <cmath>
 using namespace std;
 
 
@@ -37,7 +39,7 @@ double EL(mat *R,mat *r,
     vec dx(nDimensions);
     for(int i = 0; i<nParticles;i++){
         r1 = R(i,0);
-        for(int k=0; k<i; k++){
+        for(int k=0,k<i,k++){
             oldR(k) = R(i,k); //R is the matrix of distances
         }
         for(int k=i+1;k<nParticles;k++){
@@ -61,9 +63,8 @@ double EL(mat *R,mat *r,
 
 }
 
-
 void updateforderivative(mat &R, mat r){
-    for(int k=0; k<i; k++) {
+    for(int k=0,k<i,k++){
         for(int l =0;l<nDimensions;l++){
             dxx =r[l+i*nDimensions]-r[l+k*nDimensions];
             dx(l) = dxx*dxx;
@@ -89,7 +90,7 @@ void updateforderivative(mat &R, mat r){
 
 
 // calculates the double derivative
-//double derivative(double psil, double psi,double psih) {
-//    return (psil -2*psi + psih)/h2;
+double derivative(double psil, double psi,double psih) {
+    return (psil -2*psi + psih)/h2;
 
-//}
+}

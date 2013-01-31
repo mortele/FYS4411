@@ -164,7 +164,7 @@ void VariationalMC::updateRmatrix(const mat &r, mat &R) {
         for (int k = 0; k < nDimensions; k ++) {
             R(i,i) += r(i,k) * r(i,k); // = r_ii
         }
-        R(i,i) = sqrt(r_ii);
+        R(i,i) = sqrt(R(i,i));
 
         R(j,j) = R(i,j) = 0.0;
         for (int j = (i + 1); j < nParticles; j++) {
