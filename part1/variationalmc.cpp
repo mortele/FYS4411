@@ -12,7 +12,7 @@ using namespace arma;
 VariationalMC::VariationalMC() :
     nParticles  (2),
     nDimensions (3),
-    nCycles     (200),
+    nCycles     (2000000),
     N       (2000000),
     idum    (10),
     charge  (2.0),
@@ -21,7 +21,7 @@ VariationalMC::VariationalMC() :
     alph    (0.5*charge),
     beta    (1.0),
     Z       (2.0),
-    stepSize(0.1) {
+    stepSize(0.5) {
 }
 
 /* Runs the Metropolis algorithm nCycles times. */
@@ -32,15 +32,15 @@ void VariationalMC::runMetropolis() {
     mat Rnew           = zeros<mat>(nParticles, nDimensions);   // Matrix of distances and magnitudes.
     mat Rold           = zeros<mat>(nParticles, nDimensions);
 
-    double ecoeff;
+    double ecoeff          = 0.0;
     double newWaveFunction = 0.0;
     double oldWaveFunction = 0.0;
 
     double energy          = 0.0;
     double energy2         = 0.0;
+
     double energySum       = 0.0;
     double energy2Sum      = 0.0;
-
 
 
     // Fill coordinates arrays with random values.
@@ -72,7 +72,7 @@ void VariationalMC::runMetropolis() {
         newWaveFunction = computePsi(Rnew);
 
         // Check if the suggested move is accepted.
-        ecoeff = newWaveFunction/oldWaveFunction;
+        ecoeff = newWaveFunction / oldWaveFunction;
         if (ecoeff>ran0(&idum)) {   
             coordinatesOld = coordinatesNew;
 
@@ -213,32 +213,39 @@ void VariationalMC::updateRmatrix(const mat &r, mat &R) {
 /*Updates the distance matrix when we have just changed one coordinate of particle "i" (like we do when computing the derivative)*/
 void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
     vec dx(nDimensions);
-    dx.clear();
+    dx.zeros();
     double dxx;
 
     for(int k=0; k<i; k++) {
         for(int l =0;l<nDimensions;l++){
-            dxx =r[l+i*nDimensions]-r[l+k*nDimensions];   //this may need to be changed to r[i,l] - r[k,l] (likewise for the next loops)
+            dxx = r(i,l) - r(k,l); // [l+i*nDimensions]-r[l+k*nDimensions];   //this may need to be changed to r[i,l] - r[k,l]
+                                                          // (likewise for the next loops)
             dx(l) = dxx*dxx;
         }
 
         R(i,k) = sqrt(sum(dx)); //R is the matrix of distances
-        dx.clear();
+        dx.zeros();
     }
+
+
     for(int k=i+1;k<nParticles;k++){
         for(int l =0;l<nDimensions;l++){
-            dxx =r[l+i*nDimensions]-r[l+k*nDimensions];
-            dx(l) = dxx*dxx;
+
+            dxx = r(i,l) - r(k,l);;
+            dx(l) = dxx * dxx;
+
         }
 
         R(i,k) = sqrt(sum(dx)); //R is the matrix of distances
-        dx.clear();
+        dx.zeros();
     }
+
     for(int l =0;l<nDimensions;l++){
-        dxx =r[l+i*nDimensions]*r[l+i*nDimensions];
+        dxx = r(i,l); //r[l+i*nDimensions]*r[l+i*nDimensions];
         dx(l) = dxx*dxx;
     }
+
     R(i,i) = sqrt(sum(dx));
-    dx.clear();
+    dx.zeros();
 }
 
