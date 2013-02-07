@@ -72,7 +72,8 @@ void VariationalMC::runMetropolis() {
         newWaveFunction = computePsi(Rnew);
 
         // Check if the suggested move is accepted.
-        if (1==1) {
+        double ecoeff = enew/eold;
+        if (ecoeff>ran0(&idum)) {    // ????????????????????????
             coordinatesOld = coordinatesNew;
 
             // Energy changes from previous state.
@@ -209,7 +210,7 @@ void VariationalMC::updateRmatrix(const mat &r, mat &R) {
 }
 
 
-
+/*Updates the distance matrix when we have just changed one coordinate of particle "i" (like we do when computing the derivative)*/
 void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
     vec dx(nDimensions);
     dx.clear();
@@ -217,7 +218,7 @@ void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
 
     for(int k=0; k<i; k++) {
         for(int l =0;l<nDimensions;l++){
-            dxx =r[l+i*nDimensions]-r[l+k*nDimensions];
+            dxx =r[l+i*nDimensions]-r[l+k*nDimensions];   //this may need to be changed to r[i,l] - r[k,l] (likewise for the next loops)
             dx(l) = dxx*dxx;
         }
 
