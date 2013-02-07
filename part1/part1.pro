@@ -6,10 +6,12 @@ CONFIG -= qt
 SOURCES += main.cpp \
     functions.cpp \
     variationalmc.cpp\
-    ../newfunctions.cpp
+    ../newfunctions.cpp \
+    varmc.cpp
 
 HEADERS += \
     functions.h \
-    variationalmc.h
+    variationalmc.h \
+    varmc.h
 
 

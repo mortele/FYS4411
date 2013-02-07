@@ -1,5 +1,5 @@
-#ifndef VARIATIONALMC_H
-#define VARIATIONALMC_H
+#ifndef VARMC_H
+#define VARMC_H
 
 #include <armadillo>
 
@@ -7,7 +7,7 @@ using namespace std;
 using namespace arma;
 
 
-class VariationalMC {
+class VarMC {
     private:
         int     nParticles;
         int     nDimensions;
@@ -18,6 +18,7 @@ class VariationalMC {
         double  h;
         double  h2;
         double  alph;
+        double  alph2;
         double  beta;
         double  Z;
         double  stepSize;
@@ -29,7 +30,7 @@ class VariationalMC {
         void   updateForDerivative(mat &, const mat &, int );
 
     public:
-        VariationalMC();
+        VarMC();
         double runMetropolis(double, double);
 };
 
