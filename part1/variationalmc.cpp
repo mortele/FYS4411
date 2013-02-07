@@ -21,7 +21,7 @@ VariationalMC::VariationalMC() :
     alph    (0.5*charge),
     beta    (1.0),
     Z       (2.0),
-    stepSize(1.0) {
+    stepSize(0.1) {
 }
 
 /* Runs the Metropolis algorithm nCycles times. */
@@ -32,7 +32,7 @@ void VariationalMC::runMetropolis() {
     mat Rnew           = zeros<mat>(nParticles, nDimensions);   // Matrix of distances and magnitudes.
     mat Rold           = zeros<mat>(nParticles, nDimensions);
 
-
+    double ecoeff;
     double newWaveFunction = 0.0;
     double oldWaveFunction = 0.0;
 
@@ -72,8 +72,8 @@ void VariationalMC::runMetropolis() {
         newWaveFunction = computePsi(Rnew);
 
         // Check if the suggested move is accepted.
-        double ecoeff = enew/eold;
-        if (ecoeff>ran0(&idum)) {    // ????????????????????????
+        ecoeff = newWaveFunction/oldWaveFunction;
+        if (ecoeff>ran0(&idum)) {   
             coordinatesOld = coordinatesNew;
 
             // Energy changes from previous state.
