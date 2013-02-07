@@ -115,13 +115,13 @@ double VariationalMC::computePsi(const mat &R) {
 
 
 
-/* Computes the energy of a state defined by position matrix r. */
+/* Computes the local energy of a state defined by position matrix r, and distance matrix R. EL = 1/psi * H * psi */
 double VariationalMC::computeEnergy(mat &R, mat &r, double psi)
 {
     double r12 = R(0,1);
     double r1 = R(0,0);
     double r2 = R(1,1);
-    double E1 = (-Z*(1/r1 +1/r2) +1/r12);
+    double E1 = (-Z*(1/r1 +1/r2) +1/r12);   //this is the commutative part of the hamiltonian (we can just multiply it with psi.)
     double E2 = 0;
 
     /*
@@ -139,6 +139,7 @@ double VariationalMC::computeEnergy(mat &R, mat &r, double psi)
     double psil, psih;
 
     for(int i = 0; i<nParticles;i++){
+        /*        
         r1 = R(i,0);
 
         for(int k=0; k<i; k++){
@@ -149,7 +150,7 @@ double VariationalMC::computeEnergy(mat &R, mat &r, double psi)
         for(int k = i + 1; k < nParticles; k++) { // nParticles
             oldR(k) = R(i,k);
         }
-
+        */
         for(int j = 0; j<nDimensions;j++){
             r(i,j)-=h; //r is the array of coordinates
 
@@ -161,8 +162,8 @@ double VariationalMC::computeEnergy(mat &R, mat &r, double psi)
             psih = computePsi(R);
             r(i,j)-=h;
             E2-=computeDoubleDerivative(psil, psi,psih);
+            updateForDerivative(R, r, i);   // set all values back to normal
         }
-
     }
 
     return E2/psi +E1;
@@ -211,6 +212,7 @@ void VariationalMC::updateRmatrix(const mat &r, mat &R) {
 
 void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
     vec dx(nDimensions);
+    dx.clear();
     double dxx;
 
     for(int k=0; k<i; k++) {
@@ -220,6 +222,7 @@ void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
         }
 
         R(i,k) = sqrt(sum(dx)); //R is the matrix of distances
+        dx.clear();
     }
     for(int k=i+1;k<nParticles;k++){
         for(int l =0;l<nDimensions;l++){
@@ -228,11 +231,13 @@ void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
         }
 
         R(i,k) = sqrt(sum(dx)); //R is the matrix of distances
+        dx.clear();
     }
     for(int l =0;l<nDimensions;l++){
         dxx =r[l+i*nDimensions]*r[l+i*nDimensions];
         dx(l) = dxx*dxx;
     }
-    R(i,0) = sqrt(sum(dx));
+    R(i,i) = sqrt(sum(dx));
+    dx.clear();
 }
 
