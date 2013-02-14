@@ -21,12 +21,15 @@ class VariationalMC {
         double  beta;
         double  Z;
         double  stepSize;
+        double  D;
 
-        double computePsi(const mat &);
-        double computeEnergy(mat &, mat &, double);
+        double computePsi(const mat&);
+        double computeEnergy(mat&, mat&, double);
         double computeDoubleDerivative(double, double, double);
-        void   updateRmatrix(const mat &, mat &);
-        void   updateForDerivative(mat &, const mat &, int );
+        double computeFirstDerivative (double, double);
+        void   updateRmatrix(const mat&, mat&);
+        void   updateForDerivative(mat&, const mat&, int );
+        vec    computeQuantumForce(mat&, mat&, double);
 
     public:
         VariationalMC();
