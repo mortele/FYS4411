@@ -177,7 +177,7 @@ double VariationalMC::computeEnergy(mat &R, mat &r, double psi)
 
     double r12 = R(0,1);
     //double r1  = R(0,0);
-    //double r2  = R(1,1);
+    //double r2  = R(1,1); HALLO
     double E2  = 0; "hei morten !!!"
     double E1  = (1/r12); // + (-Z*(1/r1 +1/r2));    // this is the commutative part of the
                                              // hamiltonian (we can just multiply it with psi.)
