@@ -14,7 +14,6 @@ class VariationalMC {
         int     nCycles;
         int     N;
         long    idum;
-        double  charge;
         double  h;
         double  h2;
         double  alph;

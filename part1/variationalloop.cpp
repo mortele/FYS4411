@@ -11,7 +11,6 @@ void VariationalLoop::initialize_helium() {
     this->minE  = 1e300;
     this->minA  = 0.0;
     this->minB  = 0.0;
-
 }
 
 void VariationalLoop::run() {

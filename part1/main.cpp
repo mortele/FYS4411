@@ -19,7 +19,7 @@ using namespace arma;
 
 int main() {
     // Initialize instances of variational monte carlo classes.
-    VariationalMC m;
+    VariationalMC   m;
     VariationalLoop l;
 
     // Initialize relevant values for the Helium atom..

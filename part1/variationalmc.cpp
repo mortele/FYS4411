@@ -16,7 +16,6 @@ VariationalMC::VariationalMC() :
     nCycles     (10000000),
     N       (nCycles / 10),
     idum    (17),
-    charge  (2.0),
     h       (0.0001),
     h2      (h * h),
     alph    (1.0),
