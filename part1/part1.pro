@@ -8,13 +8,15 @@ SOURCES += main.cpp \
     variationalmc.cpp\
     ../newfunctions.cpp \
     varmc.cpp \
-    variationalloop.cpp
+    variationalloop.cpp \
+    wavefunctions.cpp
 
 HEADERS += \
     functions.h \
     variationalmc.h \
     varmc.h \
-    variationalloop.h
+    variationalloop.h \
+    wavefunctions.h
 
 release {
     DEFINES += ARMA_NO_DEBUG
