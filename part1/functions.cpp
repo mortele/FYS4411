@@ -13,7 +13,7 @@ double psi(double *coordinates)
 
 
 //calculates the local energy at a point
-double EL(mat *R,mat *r,
+double EL(mat &R,mat &r,
           double psi)
 {
     r12 = R(0,1);
@@ -61,7 +61,7 @@ double EL(mat *R,mat *r,
 
 }
 
-void updateforderivative(mat &R, mat r){
+void updateforderivative(mat &R, mat &r){
     for(int k=0,k<i,k++){
         for(int l =0;l<nDimensions;l++){
             dxx =r[l+i*nDimensions]-r[l+k*nDimensions];
