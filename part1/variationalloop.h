@@ -1,10 +1,12 @@
 #ifndef VARIATIONALLOOP_H
 #define VARIATIONALLOOP_H
 #include "variationalmc.h"
+#include "varmc.h"
 
 class VariationalLoop {
     private:
         VariationalMC m;
+        //VarMC   m;
         int     N;
         double  start;
         double  end;

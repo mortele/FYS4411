@@ -12,7 +12,7 @@ using namespace arma;
 VarMC::VarMC() :
     nParticles  (2),
     nDimensions (3),
-    nCycles     (10000000),
+    nCycles     (100000000),
     N       (nCycles / 10),
     idum    (17),
     charge  (2.0),
@@ -22,12 +22,13 @@ VarMC::VarMC() :
     alph2   (alph * alph),
     beta    (1.0),
     Z       (2.0),
-    stepSize(0.01) {
+    stepSize(0.07) {
 }
 
 /* Runs the Metropolis algorithm nCycles times. */
 double VarMC::runMetropolis(double alpha, double beta) {
     this->alph = alpha;
+    this->alph2 = alph * alph;
     this->beta = beta;
 
     mat coordinatesNew = zeros<mat>(nParticles, nDimensions);
@@ -109,9 +110,9 @@ double VarMC::runMetropolis(double alpha, double beta) {
 
             // Energy changes from previous state.
             energy = computeEnergy(Rnew, coordinatesNew, newWaveFunction);
-            if (Rnew(0,1) < 0.01) {
+            /*if (Rnew(0,1) < 0.01) {
                 cout << "hei" << endl;
-            }
+            }*/
 
         } else {
             coordinatesNew = coordinatesOld;

@@ -6,11 +6,11 @@
 #include <armadillo>
 
 #include "lib.h"
-#include "variationalmc.h"
+//#include "variationalmc.h"
 #include "variationalloop.h"
 
 //Old version of variationalmc.h, using numerical double derivatives.
-//#include "varmc.h"
+#include "varmc.h"
 
 using namespace std;
 using namespace arma;
@@ -19,6 +19,7 @@ using namespace arma;
 
 int main() {
     // Initialize instances of variational monte carlo classes.
+    // VarMC m;
     VariationalMC   m;
     VariationalLoop l;
 
