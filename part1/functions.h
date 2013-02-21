@@ -2,10 +2,9 @@
 #define FUNCTIONS_H
 
 
-class functions
-{
-public:
-    functions();
+class functions {
+    public:
+        functions();
 };
 
 #endif // FUNCTIONS_H

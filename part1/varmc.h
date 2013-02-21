@@ -1,5 +1,5 @@
-#ifndef VARIATIONALMC_H
-#define VARIATIONALMC_H
+#ifndef VARMC_H
+#define VARMC_H
 
 #include <armadillo>
 
@@ -7,31 +7,30 @@ using namespace std;
 using namespace arma;
 
 
-class VariationalMC {
+class VarMC {
     private:
         int     nParticles;
         int     nDimensions;
         int     nCycles;
         int     N;
         long    idum;
+        double  charge;
         double  h;
         double  h2;
         double  alph;
+        double  alph2;
         double  beta;
         double  Z;
         double  stepSize;
-        double  D;
 
-        double computePsi(const mat&);
-        double computeEnergy(mat&, mat&, double);
+        double computePsi(const mat &);
+        double computeEnergy(mat &, mat &, double);
         double computeDoubleDerivative(double, double, double);
-        double computeFirstDerivative (double, double);
-        void   updateRmatrix(const mat&, mat&);
-        void   updateForDerivative(mat&, const mat&, int );
-        vec    computeQuantumForce(mat&, mat&, double);
+        void   updateRmatrix(const mat &, mat &);
+        void   updateForDerivative(mat &, const mat &, int );
 
     public:
-        VariationalMC();
+        VarMC();
         double runMetropolis(double, double);
 };
 

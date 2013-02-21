@@ -5,15 +5,25 @@ CONFIG -= qt
 
 SOURCES += main.cpp \
     functions.cpp \
-<<<<<<< HEAD
-    ../newfunctions.cpp
-=======
-    variationalmc.cpp
->>>>>>> 0465b507eec419ff73a9943bf8c211baec60437b
+    variationalmc.cpp\
+    ../newfunctions.cpp \
+    varmc.cpp \
+    variationalloop.cpp
 
 HEADERS += \
     functions.h \
-    variationalmc.h
+    variationalmc.h \
+    varmc.h \
+    variationalloop.h
 
-HEADERS +=
-
+release {
+    DEFINES += ARMA_NO_DEBUG
+    QMAKE_LFLAGS -= -O1
+    QMAKE_LFLAGS += -O3
+    QMAKE_LFLAGS_RELEASE -= -O1
+    QMAKE_LFLAGS_RELEASE += -O3
+    QMAKE_CXXFLAGS -= -O2
+    QMAKE_CXXFLAGS += -O3
+    QMAKE_CXXFLAGS_RELEASE -= -O2
+    QMAKE_CXXFLAGS_RELEASE += -O3
+}
