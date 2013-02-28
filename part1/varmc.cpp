@@ -12,7 +12,7 @@ using namespace arma;
 VarMC::VarMC() :
     nParticles  (2),
     nDimensions (3),
-    nCycles     (100000000),
+    nCycles     (1000),
     N       (nCycles / 10),
     idum    (17),
     charge  (2.0),
