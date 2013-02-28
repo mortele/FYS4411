@@ -216,36 +216,37 @@ void VarMC::updateRmatrix(const mat &r, mat &R) {
 void VarMC::updateForDerivative(mat &R, const mat &r, int i){
 
     double dxx;
-
     for(int k=0; k<i; k++) {
+        double sum = 0;
         for(int l =0;l<nDimensions;l++){
             dxx = r(i,l) - r(k,l); // [l+i*nDimensions]-r[l+k*nDimensions];   //this may need to be changed to r[i,l] - r[k,l]
                                                          // (likewise for the next loops)
-            dx(l) = dxx*dxx;
+            sum += dxx*dxx;
         }
 
-        R(k,i) = sqrt(sum(dx)); //R is the matrix of distances
+        R(k,i) = sqrt(sum); //R is the matrix of distances
 
     }
 
 
     for(int k=i+1;k<nParticles;k++){
+        double sum = 0;
         for(int l =0;l<nDimensions;l++){
 
             dxx = r(i,l) - r(k,l);;
-            dx(l) = dxx * dxx;
+            sum += dxx*dxx;
 
         }
 
-        R(i,k) = sqrt(sum(dx)); //R is the matrix of distances
+        R(i,k) = sqrt(sum); //R is the matrix of distances
 
     }
-
+    double sum = 0;
     for(int l =0;l<nDimensions;l++){
         dxx = r(i,l); //r[l+i*nDimensions]*r[l+i*nDimensions];
-        dx(l) = dxx*dxx;
+        sum += dxx*dxx;
     }
 
-    R(i,i) = sqrt(sum(dx));
+    R(i,i) = sqrt(sum);
 }
 
