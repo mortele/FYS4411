@@ -1,12 +1,16 @@
+#include <iostream>
+#include <fstream>
+#include <iomanip>
 #include "variationalloop.h"
+
 
 VariationalLoop::VariationalLoop() {
 }
 
 void VariationalLoop::initialize_helium() {
-    this->N = 20;
-    this->start = 1.5;
-    this->end   = 2.5;
+    this->N     = 100;
+    this->start = 0.9;
+    this->end   = 2.1;
     this->E     = 0.0;
     this->minE  = 1e300;
     this->minA  = 0.0;
@@ -14,24 +18,50 @@ void VariationalLoop::initialize_helium() {
 }
 
 void VariationalLoop::run() {
+
+
+    ofstream outFile("data_varying_a_and_b__N_100_points_from_0_9_to_2_0.dat");
+    double startClock, finishClock, acceptanceRatio;
+
     b = 1.0;
+    for (int k = 0; k < N; k++) {
+        for (int j = 0; j < N; j++) {
+            startClock = clock();
+            b = start + ((end-start)/N) * k;
+            a = start + ((end-start)/N) * j;
 
-    for (int j = 0; j < N; j++) {
-        a = start + ((end-start)/N) * j;
-        cout << "b = "<< b << endl << "a = " << a << endl;
-        E = m.runMetropolis(a,b);
+            cout << "/-------------------------------------------------------------\\" << endl;
+            printf("|   For parameters:    a = %8.4f,   and    b = %8.4f    |\n", a, b);
+            cout << "\\-------------------------------------------------------------/" << endl;
 
-        if (E < minE) {
-            minE = E;
-            minA = a;
-            minB = b;
-            cout << "minA=" << minA << endl;
-            cout << "minB=" << minB << endl;
-            cout << "minE=" << minE << endl;
+            E = m.runMetropolis(a,b);
+            acceptanceRatio = m.acceptanceRatio;
+
+            outFile << setprecision(15) << a << " " << b << " " << E << " " << acceptanceRatio <<endl;
+
+            if (E < minE) {
+                minE = E;
+                minA = a;
+                minB = b;
+                //            cout << "minA=" << minA << endl;
+                //            cout << "minB=" << minB << endl;
+                //            cout << "minE=" << minE << endl;
+            }
+            finishClock = clock();
+            cout << "   * Time usage       = " << (finishClock - startClock) / 1000000.0 << " [s] "<< endl;
+            cout << endl << endl;
         }
-        cout << endl << endl;
     }
-    cout << "a " << minA << endl;
-    cout << "b " << minB << endl;
-    cout << "minE=" << minE << endl;
+
+    double Eexperimental = -2.9037;
+    cout << "/-------------------------------------------------------------\\" << endl;
+    printf("|                     Best parameters found                    |\n");
+    cout << "\\-------------------------------------------------------------/" << endl;
+    cout << "   * a                     = " << minA << endl;
+    cout << "   * b                     = " << minB << endl;
+    cout << "   * With corresponding E  = " << minE << endl;
+    cout << "   * Experimental value E' = " << Eexperimental << endl;
+    cout << "   * |E - E'|              = " << abs(minE - Eexperimental) << endl << endl << endl;
+
+    outFile.close();
 }

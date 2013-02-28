@@ -31,6 +31,7 @@ class VarMC {
         void   updateForDerivative(mat &, const mat &, int );
 
     public:
+        double acceptanceRatio;
         VarMC();
         double runMetropolis(double, double);
 };

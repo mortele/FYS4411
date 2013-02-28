@@ -23,7 +23,8 @@ VarMC::VarMC() :
     beta    (1.0),
     Z       (2.0),
     stepSize(0.07),
-    dx      (zeros(nDimensions)){
+    dx      (zeros(nDimensions)),
+    acceptanceRatio(0.0) {
 }
 
 /* Runs the Metropolis algorithm nCycles times. */
@@ -129,11 +130,12 @@ double VarMC::runMetropolis(double alpha, double beta) {
     energy  = energySum  / (nCycles - N);
     energy2 = energy2Sum / (nCycles - N);
 
-    cout << "<E>  = " << energy << endl;
-    cout << "<E²> = " << energy2 << endl;
-    cout << "Variance  = " << (energy2 - energy*energy)/(nCycles-N) << endl;
-    cout << "Std. dev. = " << sqrt((energy2 - energy*energy)/(nCycles-N)) << endl;
-    cout << "Acceptance ratio = " << ((double) accepted) / nCycles << endl;
+    cout << "   * <E>              = " << energy << endl;
+    cout << "   * <E²>             = " << energy2 << endl;
+    cout << "   * Variance         = " << (energy2 - energy*energy)/(nCycles-N) << endl;
+    cout << "   * Std. dev.        = " << sqrt((energy2 - energy*energy)/(nCycles-N)) << endl;
+    cout << "   * Acceptance ratio = " << ((double) accepted) / nCycles << endl;
+    this->acceptanceRatio = ((double) accepted) / nCycles;
 
     return energy;
 }

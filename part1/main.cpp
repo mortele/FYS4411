@@ -16,6 +16,8 @@ using namespace std;
 using namespace arma;
 
 
+// TODO: Finn ut hvorfor acceptance ratio er syykt stor (typ >0.95) for virtually alle alphaverdier.
+//       Er stepsize bare for liten?
 
 int main() {
     VariationalLoop l;
