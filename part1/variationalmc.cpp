@@ -370,38 +370,40 @@ void VariationalMC::updateRmatrix(const mat &r, mat &R) {
 /* Updates the distance matrix when we have just changed one coordinate of particle "i"
  * (like we do when computing the derivative)*/
 void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
-    double dxx;
 
+    double dxx, sum;
     for(int k=0; k<i; k++) {
+        sum = 0;
         for(int l =0;l<nDimensions;l++){
             dxx = r(i,l) - r(k,l); // [l+i*nDimensions]-r[l+k*nDimensions];   //this may need to be changed to r[i,l] - r[k,l]
-                                                          // (likewise for the next loops)
-            dx(l) = dxx*dxx;
+                                                         // (likewise for the next loops)
+            sum += dxx*dxx;
         }
 
-        R(k,i) = sqrt(sum(dx)); //R is the matrix of distances
+        R(k,i) = sqrt(sum); //R is the matrix of distances
 
     }
 
 
     for(int k=i+1;k<nParticles;k++){
+        sum = 0;
         for(int l =0;l<nDimensions;l++){
 
             dxx = r(i,l) - r(k,l);;
-            dx(l) = dxx * dxx;
+            sum += dxx*dxx;
 
         }
 
-        R(i,k) = sqrt(sum(dx)); //R is the matrix of distances
+        R(i,k) = sqrt(sum); //R is the matrix of distances
 
     }
-
+    sum = 0;
     for(int l =0;l<nDimensions;l++){
         dxx = r(i,l); //r[l+i*nDimensions]*r[l+i*nDimensions];
-        dx(l) = dxx*dxx;
+        sum += dxx*dxx;
     }
 
-    R(i,i) = sqrt(sum(dx));
+    R(i,i) = sqrt(sum);
 }
 
 

@@ -12,7 +12,7 @@ using namespace arma;
 VarMC::VarMC() :
     nParticles  (2),
     nDimensions (3),
-    nCycles     (1000),
+    nCycles     (100000000),
     N       (nCycles / 10),
     idum    (17),
     charge  (2.0),
@@ -80,10 +80,10 @@ double VarMC::runMetropolis(double alpha, double beta) {
     // Compute the wave function in this initial state.
     oldWaveFunction = computePsi(Rnew);
 
-    // Metropolis loop.
+    // The Metropolis loop itself.
     for (int k = 0; k < nCycles; k++) {
-        // Suggest new positions for all particles, i.e. new state.
 
+        // Suggest new positions for one particle, i.e. new state.
         randI = ran0(&idum) * nParticles;
         iRand = floor(randI);
 
@@ -92,9 +92,7 @@ double VarMC::runMetropolis(double alpha, double beta) {
             coordinatesNew(iRand,j) += (ran0(&idum)-0.5) * stepSize;
         }
 
-
         // Compute the wavefunction in this new state.
-        //updateRmatrix(coordinatesNew, Rnew);
         updateForDerivative(Rnew, coordinatesNew,iRand);
         newWaveFunction = computePsi(Rnew);
 
@@ -102,12 +100,18 @@ double VarMC::runMetropolis(double alpha, double beta) {
         ecoeff = newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
         if (ecoeff > ran0(&idum)) {
             accepted++;
-            coordinatesOld = coordinatesNew;
+            coordinatesOld  = coordinatesNew;
+            oldWaveFunction = newWaveFunction;
+
+            // c = a
+            // a = b
+            // b = c
 
             // Energy changes from previous state.
             energy = computeEnergy(Rnew, coordinatesNew, newWaveFunction);
         } else {
-            coordinatesNew = coordinatesOld;
+            coordinatesNew  = coordinatesOld;
+
             // Energy remains unchanged.
         }
 
@@ -129,7 +133,7 @@ double VarMC::runMetropolis(double alpha, double beta) {
     cout << "<E²> = " << energy2 << endl;
     cout << "Variance  = " << (energy2 - energy*energy)/(nCycles-N) << endl;
     cout << "Std. dev. = " << sqrt((energy2 - energy*energy)/(nCycles-N)) << endl;
-    cout << "Accepted steps / total steps = " << ((double) accepted) / nCycles << endl;
+    cout << "Acceptance ratio = " << ((double) accepted) / nCycles << endl;
 
     return energy;
 }
@@ -191,7 +195,6 @@ void VarMC::updateRmatrix(const mat &r, mat &R) {
         R(i,i) = sqrt(R(i,i));
 
         for (int j = (i + 1); j < nParticles; j++) {
-
             // Compute magnitude of r(i,:) - r(j,:) position vector.
             R(i,j) = 0.0;
             for (int k = 0; k < nDimensions; k++) {
@@ -215,9 +218,9 @@ void VarMC::updateRmatrix(const mat &r, mat &R) {
  * (like we do when computing the derivative)*/
 void VarMC::updateForDerivative(mat &R, const mat &r, int i){
 
-    double dxx;
+    double dxx, sum;
     for(int k=0; k<i; k++) {
-        double sum = 0;
+        sum = 0;
         for(int l =0;l<nDimensions;l++){
             dxx = r(i,l) - r(k,l); // [l+i*nDimensions]-r[l+k*nDimensions];   //this may need to be changed to r[i,l] - r[k,l]
                                                          // (likewise for the next loops)
@@ -230,7 +233,7 @@ void VarMC::updateForDerivative(mat &R, const mat &r, int i){
 
 
     for(int k=i+1;k<nParticles;k++){
-        double sum = 0;
+        sum = 0;
         for(int l =0;l<nDimensions;l++){
 
             dxx = r(i,l) - r(k,l);;
@@ -241,7 +244,7 @@ void VarMC::updateForDerivative(mat &R, const mat &r, int i){
         R(i,k) = sqrt(sum); //R is the matrix of distances
 
     }
-    double sum = 0;
+    sum = 0;
     for(int l =0;l<nDimensions;l++){
         dxx = r(i,l); //r[l+i*nDimensions]*r[l+i*nDimensions];
         sum += dxx*dxx;
