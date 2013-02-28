@@ -4,9 +4,9 @@ VariationalLoop::VariationalLoop() {
 }
 
 void VariationalLoop::initialize_helium() {
-    this->N = 50;
-    this->start = 2.0;
-    this->end   = 2.9;
+    this->N = 20;
+    this->start = 1.5;
+    this->end   = 2.5;
     this->E     = 0.0;
     this->minE  = 1e300;
     this->minA  = 0.0;

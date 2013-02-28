@@ -22,6 +22,7 @@ class VarMC {
         double  beta;
         double  Z;
         double  stepSize;
+        vec dx;
 
         double computePsi(const mat &);
         double computeEnergy(mat &, mat &, double);

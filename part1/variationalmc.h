@@ -23,6 +23,7 @@ class VariationalMC {
         double  stepSize;
         double  D;
         double  dt;
+        vec     dx;
 
         double  computePsi(const mat&);
         double  computeEnergy(mat&, mat&, double);

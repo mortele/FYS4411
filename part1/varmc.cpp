@@ -22,7 +22,8 @@ VarMC::VarMC() :
     alph2   (alph * alph),
     beta    (1.0),
     Z       (2.0),
-    stepSize(0.07) {
+    stepSize(0.07),
+    dx      (zeros(nDimensions)){
 }
 
 /* Runs the Metropolis algorithm nCycles times. */
@@ -47,7 +48,6 @@ double VarMC::runMetropolis(double alpha, double beta) {
     double energy2Sum      = 0.0;
 
     int    accepted        = 0;
-    int    percent         = 0;
 
     double randI;
     int    iRand;
@@ -82,11 +82,6 @@ double VarMC::runMetropolis(double alpha, double beta) {
 
     // Metropolis loop.
     for (int k = 0; k < nCycles; k++) {
-//        if (k % (nCycles / 10) == 0) {
-//            cout << percent << " %" << endl;
-//            percent += 10;
-//        }
-
         // Suggest new positions for all particles, i.e. new state.
 
         randI = ran0(&idum) * nParticles;
@@ -99,7 +94,8 @@ double VarMC::runMetropolis(double alpha, double beta) {
 
 
         // Compute the wavefunction in this new state.
-        updateRmatrix(coordinatesNew, Rnew);
+        //updateRmatrix(coordinatesNew, Rnew);
+        updateForDerivative(Rnew, coordinatesNew,iRand);
         newWaveFunction = computePsi(Rnew);
 
         // Check if the suggested move is accepted.
@@ -110,35 +106,29 @@ double VarMC::runMetropolis(double alpha, double beta) {
 
             // Energy changes from previous state.
             energy = computeEnergy(Rnew, coordinatesNew, newWaveFunction);
-            /*if (Rnew(0,1) < 0.01) {
-                cout << "hei" << endl;
-            }*/
-
         } else {
             coordinatesNew = coordinatesOld;
-
             // Energy remains unchanged.
         }
 
         // Add energy of this state to the energy sum.
+        energySum  += energy;
+        energy2Sum += energy * energy;
 
         if (k == N) {
             energySum  = 0.0;
             energy2Sum = 0.0;
         }
-
-        energySum  += energy;
-        energy2Sum += energy * energy;
     }
 
     // Calculate the expected value of the energy, the energy squared, and the variance.
-    energy  = energySum  / (nCycles * 0.9);
-    energy2 = energy2Sum / (nCycles * 0.9);
+    energy  = energySum  / (nCycles - N);
+    energy2 = energy2Sum / (nCycles - N);
 
     cout << "<E>  = " << energy << endl;
     cout << "<E²> = " << energy2 << endl;
-    cout << "Variance  = " << energy2 - energy*energy << endl;
-    cout << "Std. dev. = " << sqrt(energy2 - energy*energy) << endl;
+    cout << "Variance  = " << (energy2 - energy*energy)/(nCycles-N) << endl;
+    cout << "Std. dev. = " << sqrt((energy2 - energy*energy)/(nCycles-N)) << endl;
     cout << "Accepted steps / total steps = " << ((double) accepted) / nCycles << endl;
 
     return energy;
@@ -149,7 +139,7 @@ double VarMC::runMetropolis(double alpha, double beta) {
 double VarMC::computePsi(const mat &R) {
 
     double returnVal = 0.0;
-    returnVal = exp(-alph * (R(0,0) + R(1,1))) * exp(R(0,1) / (2 * (1  + beta * R(0,1))));
+    returnVal = exp(-alph * (R(0,0) + R(1,1)) + R(0,1) / (2 * (1  + beta * R(0,1)))); // ) * exp(
 
     //    for (int i = 0; i < nParticles; i++) {
     //        for (int j = (i + 1); j < nParticles; j++) {
@@ -165,6 +155,15 @@ double VarMC::computePsi(const mat &R) {
 /* Computes the local energy of a state defined by position matrix r, and distance matrix R.
  * EL = 1/psi * H * psi */
 double VarMC::computeEnergy(mat &R, mat &r, double psi) {
+//    double b1 = beta * R(0,1);
+//    double b2 = 1 + b1;
+//    double b3 = 1/(2 * b2 * b2);
+//    double prikk = r(0,0) * r(1,0) +  r(0,1) * r(1,1) + r(0,2) * r(1,2);
+
+//    double E_L1 = (alph - Z) * (1 / R(0,0)  + 1 / R(1,1)) + 1 / R(0,1) - alph2;
+//    double E_L2 = E_L1 + b3 * ( (alph * (R(0,0) + R(1,1))) / (R(0,1))  * (1 - (prikk / (R(0,0) * R(1,1)))) - b3 - 2 / R(0,1) + ((2*beta) / b2));
+//    return E_L2;
+
     double b1 = beta * R(0,1);
     double b2 = 1 + b1;
     double b3 = 1/(2 * b2 * b2);
@@ -215,19 +214,18 @@ void VarMC::updateRmatrix(const mat &r, mat &R) {
 /* Updates the distance matrix when we have just changed one coordinate of particle "i"
  * (like we do when computing the derivative)*/
 void VarMC::updateForDerivative(mat &R, const mat &r, int i){
-    vec dx(nDimensions);
-    dx.zeros();
+
     double dxx;
 
     for(int k=0; k<i; k++) {
         for(int l =0;l<nDimensions;l++){
             dxx = r(i,l) - r(k,l); // [l+i*nDimensions]-r[l+k*nDimensions];   //this may need to be changed to r[i,l] - r[k,l]
-                                                          // (likewise for the next loops)
+                                                         // (likewise for the next loops)
             dx(l) = dxx*dxx;
         }
 
-        R(i,k) = sqrt(sum(dx)); //R is the matrix of distances
-        dx.zeros();
+        R(k,i) = sqrt(sum(dx)); //R is the matrix of distances
+
     }
 
 
@@ -240,7 +238,7 @@ void VarMC::updateForDerivative(mat &R, const mat &r, int i){
         }
 
         R(i,k) = sqrt(sum(dx)); //R is the matrix of distances
-        dx.zeros();
+
     }
 
     for(int l =0;l<nDimensions;l++){
@@ -249,6 +247,5 @@ void VarMC::updateForDerivative(mat &R, const mat &r, int i){
     }
 
     R(i,i) = sqrt(sum(dx));
-    dx.zeros();
 }
 
