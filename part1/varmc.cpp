@@ -161,14 +161,15 @@ double VarMC::computePsi(const mat &R) {
 /* Computes the local energy of a state defined by position matrix r, and distance matrix R.
  * EL = 1/psi * H * psi */
 double VarMC::computeEnergy(mat &R, mat &r, double psi) {
-//    double b1 = beta * R(0,1);
-//    double b2 = 1 + b1;
-//    double b3 = 1/(2 * b2 * b2);
-//    double prikk = r(0,0) * r(1,0) +  r(0,1) * r(1,1) + r(0,2) * r(1,2);
+    //    double b1 = beta * R(0,1);
+    //    double b2 = 1 + b1;
+    //    double b3 = 1/(2 * b2 * b2);
+    //    double prikk = r(0,0) * r(1,0) +  r(0,1) * r(1,1) + r(0,2) * r(1,2);
 
-//    double E_L1 = (alph - Z) * (1 / R(0,0)  + 1 / R(1,1)) + 1 / R(0,1) - alph2;
-//    double E_L2 = E_L1 + b3 * ( (alph * (R(0,0) + R(1,1))) / (R(0,1))  * (1 - (prikk / (R(0,0) * R(1,1)))) - b3 - 2 / R(0,1) + ((2*beta) / b2));
-//    return E_L2;
+    //    double E_L1 = (alph - Z) * (1 / R(0,0)  + 1 / R(1,1)) - alph2 + 1 / R(0,1) - alph2;
+    //    double E_L2 = E_L1 + b3 * ( (alph * (R(0,0) + R(1,1))) / (R(0,1))  * (1 - (prikk / (R(0,0) * R(1,1)))) - b3 - 2 / R(0,1) + ((2*beta) / b2));
+
+    //    return E_L2;
 
     double b1 = beta * R(0,1);
     double b2 = 1 + b1;
