@@ -25,7 +25,9 @@ class VariationalMC {
         double  dt;
         vec     dx;
 
+
         double  computePsi(const mat&);
+        double  computePsi2(const mat&);
         double  computeEnergy(mat&, mat&, double);
         double  computeDoubleDerivative(double, double, double);
         double  computeFirstDerivative (double, double);

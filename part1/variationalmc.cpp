@@ -89,11 +89,11 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
 
         for (int j = 0; j < nDimensions; j++) {
             // Brute force way:
-            coordinatesNew(iRand,j) += (ran0(&idum)-0.5) * stepSize;
+            // coordinatesNew(iRand,j) += (ran0(&idum)-0.5) * stepSize;
 
             // Importance sampled way:
-            //coordinatesNew(iRand, j) += gaussian_deviate(&idum) * sqrt(dt) +
-              //                          quantumForceOld(nDimensions*iRand+j) * dt; // * 2 * D;
+            coordinatesNew(iRand, j) += gaussian_deviate(&idum) * sqrt(dt) +
+                                      quantumForceOld(nDimensions*iRand+j) * dt; // * 2 * D;
             //cout << "qforce=" << quantumForceOld(nDimensions*iRand+j) << endl;
             //cout << "normal="<<gaussian_deviate(&idum) * sqrt(dt) << endl;
             //cout << "quantum="<<quantumForceOld(nDimensions*iRand+j) * dt << endl;
@@ -103,7 +103,9 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
 
 
         // Compute the wavefunction in this new state.
-        updateRmatrix(coordinatesNew, Rnew);
+        // updateRmatrix(coordinatesNew, Rnew);
+
+        updateForDerivative(Rnew, coordinatesNew,iRand);
         newWaveFunction = computePsi(Rnew);
 
         // Compute the quantum force in this new state.
@@ -130,10 +132,10 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
         // cout << greensFunction << endl;
 
         // Check if the suggested move is accepted, brute force way.
-        ecoeff = newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
+        //ecoeff = newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
 
         // Check if the suggested move is accepted, importance sampled way.
-        //ecoeff = greensFunction * newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
+        ecoeff = greensFunction * newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
 
         if (ecoeff > ran0(&idum)) {
             accepted++;
@@ -147,19 +149,21 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
 //            cout << "r1 coordinatesz = " << coordinatesNew(0,2) << endl;
         } else {
             coordinatesNew = coordinatesOld;
-            newWaveFunction = oldWaveFunction;
+
             // Energy remains unchanged.
         }
 
         // Add energy of this state to the energy sum.
+
+        energySum  += energy;
+        energy2Sum += energy * energy;
 
         if (k == N) {
             energySum  = 0.0;
             energy2Sum = 0.0;
         }
 
-        energySum  += energy;
-        energy2Sum += energy * energy;
+
         //if (energy*energy > 1000) cout << "energy=" << energy << endl;
     }
 
@@ -197,11 +201,11 @@ double VariationalMC::computePsi(const mat &R) {
     return returnVal;
 }
 
-double VariationalMC::computePsi2(const mat &R) {
-    detup = psi_s1(R(0,0))*psi_s2(R(1,1))- psi_s1(R(1,1))*psi_s2(R(0,0));
-    detdown = psi_s1(R(2,2))*psi_s2(R(3,3))- psi_s1(R(3,3))*psi_s2(R(2,2));
-    return detup*detdown;
-}
+//double VariationalMC::computePsi2(const mat &R) {
+//    double detup = psi_s1(R(0,0))*psi_s2(R(1,1))- psi_s1(R(1,1))*psi_s2(R(0,0));
+//    double detdown = psi_s1(R(2,2))*psi_s2(R(3,3))- psi_s1(R(3,3))*psi_s2(R(2,2));
+//    return detup*detdown;
+//}
 
 
 /* Computes the local energy of a state defined by position matrix r, and distance matrix R.
@@ -214,9 +218,11 @@ double VariationalMC::computeEnergy(mat &R, mat &r, double psi)
     double b3 = 1/(2 * b2 * b2);
     double prikk = r(0,0) * r(1,0) +  r(0,1) * r(1,1) + r(0,2) * r(1,2);
 
-    double E_L1 = (alph - Z) * (1 / R(0,0)  + 1 / R(1,1)) - alph2 + 1 / R(0,1) - alph2;
+    double E_L1 = (alph - Z) * (1 / R(0,0)  + 1 / R(1,1)) + 1 / R(0,1) - alph2;
     double E_L2 = E_L1 + b3 * ( (alph * (R(0,0) + R(1,1))) / (R(0,1))  * (1 - (prikk / (R(0,0) * R(1,1)))) - b3 - 2 / R(0,1) + ((2*beta) / b2));
-    return E_L1;
+    return E_L2;
+
+
 
 
     //double r1  = R(0,0);
