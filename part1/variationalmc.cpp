@@ -13,7 +13,7 @@ using namespace arma;
 VariationalMC::VariationalMC() :
     nParticles  (2),
     nDimensions (3),
-    nCycles     (1000),
+    nCycles     (1000000),
     N       (2 * nCycles / 10),
     idum    (time(0)),
     h       (0.0001),
@@ -62,7 +62,7 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
     // Fill coordinates arrays with random values.
     for (int i = 0; i < nParticles; i++) {
         for (int j = 0; j < nDimensions; j++) {
-            coordinatesNew(i,j) = coordinatesOld(i,j) = 2*(ran0(&idum)-0.5) / (0.5*alph);
+            coordinatesNew(i,j) = coordinatesOld(i,j) = (ran0(&idum)-0.5) / (0.5*alph);
             // cout << coordinatesNew(i,j)  << endl;
         }
     }
@@ -89,11 +89,11 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
 
         for (int j = 0; j < nDimensions; j++) {
             // Brute force way:
-            //coordinatesNew(iRand,j) += (ran0(&idum)-0.5) * stepSize;
+            coordinatesNew(iRand,j) += (ran0(&idum)-0.5) * stepSize;
 
             // Importance sampled way:
-            coordinatesNew(iRand, j) += gaussian_deviate(&idum) * sqrt(dt) +
-                                        quantumForceOld(nDimensions*iRand+j) * dt; // * 2 * D;
+            //coordinatesNew(iRand, j) += gaussian_deviate(&idum) * sqrt(dt) +
+              //                          quantumForceOld(nDimensions*iRand+j) * dt; // * 2 * D;
             //cout << "qforce=" << quantumForceOld(nDimensions*iRand+j) << endl;
             //cout << "normal="<<gaussian_deviate(&idum) * sqrt(dt) << endl;
             //cout << "quantum="<<quantumForceOld(nDimensions*iRand+j) * dt << endl;
@@ -128,16 +128,16 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
         // cout << greensFunction << endl;
 
         // Check if the suggested move is accepted, brute force way.
-        //ecoeff = newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
+        ecoeff = newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
 
         // Check if the suggested move is accepted, importance sampled way.
-        ecoeff = greensFunction * newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
+        //ecoeff = greensFunction * newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
 
         if (ecoeff > ran0(&idum)) {
             accepted++;
             coordinatesOld  = coordinatesNew;
             quantumForceOld = quantumForceNew;
-
+            oldWaveFunction = newWaveFunction;
             // Energy changes from previous state.
             energy = computeEnergy(Rnew, coordinatesNew, newWaveFunction);
 //            cout << "r1 coordinatesx = " << coordinatesNew(0,0) << endl;
@@ -145,6 +145,7 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
 //            cout << "r1 coordinatesz = " << coordinatesNew(0,2) << endl;
         } else {
             coordinatesNew = coordinatesOld;
+            newWaveFunction = oldWaveFunction;
             // Energy remains unchanged.
         }
 
@@ -209,7 +210,7 @@ double VariationalMC::computeEnergy(mat &R, mat &r, double psi)
 
     double E_L1 = (alph - Z) * (1 / R(0,0)  + 1 / R(1,1)) - alph2 + 1 / R(0,1) - alph2;
     double E_L2 = E_L1 + b3 * ( (alph * (R(0,0) + R(1,1))) / (R(0,1))  * (1 - (prikk / (R(0,0) * R(1,1)))) - b3 - 2 / R(0,1) + ((2*beta) / b2));
-    return E_L1 + E_L2;
+    return E_L1;
 
 
     //double r1  = R(0,0);

@@ -29,15 +29,16 @@ void VariationalLoop::run() {
             startClock = clock();
             b = start + ((end-start)/N) * k;
             a = start + ((end-start)/N) * j;
-
+a = 1.85;
+b = 0.35;
             cout << "/-------------------------------------------------------------\\" << endl;
             printf("|   For parameters:    a = %8.4f,   and    b = %8.4f    |\n", a, b);
             cout << "\\-------------------------------------------------------------/" << endl;
 
             E = m.runMetropolis(a,b);
-            acceptanceRatio = m.acceptanceRatio;
+            //acceptanceRatio = m.acceptanceRatio;
 
-            outFile << setprecision(15) << a << " " << b << " " << E << " " << acceptanceRatio <<endl;
+            //outFile << setprecision(15) << a << " " << b << " " << E << " " << acceptanceRatio <<endl;
 
             if (E < minE) {
                 minE = E;
