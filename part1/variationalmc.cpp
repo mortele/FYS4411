@@ -115,10 +115,12 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
             for (int j = 0; j < nDimensions; j++) {
                 double pX = (coordinatesNew(i,j) - coordinatesOld(i,j) - D * dt * quantumForceOld(nDimensions*i+j));
                 double pY = (coordinatesOld(i,j) - coordinatesNew(i,j) - D * dt * quantumForceNew(nDimensions*i+j));
+
+
                 greensFunction += -(pX*pX/(4*D*dt)) + (pY*pY / (4*D*dt));
-                greensFunction += 0.5 * (quantumForceOld(nDimensions*i+j) + quantumForceNew(nDimensions*i+j)) *
-                                  (D * dt * 0.5 * (quantumForceOld(nDimensions*i+j) - quantumForceNew(nDimensions*i+j)) -
-                                  coordinatesNew(i,j) + coordinatesOld(i,j));
+//                greensFunction += 0.5 * (quantumForceOld(nDimensions*i+j) + quantumForceNew(nDimensions*i+j)) *
+//                                  (D * dt * 0.5 * (quantumForceOld(nDimensions*i+j) - quantumForceNew(nDimensions*i+j)) -
+//                                  coordinatesNew(i,j) + coordinatesOld(i,j));
             }
         }
 
