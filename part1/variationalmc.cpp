@@ -165,7 +165,11 @@ double VariationalMC::computePsi(const mat &R) {
     return returnVal;
 }
 
-
+double VariationalMC::computePsi2(const mat &R) {
+    detup = psi_s1(R(0,0))*psi_s2(R(1,1))- psi_s1(R(1,1))*psi_s2(R(0,0));
+    detdown = psi_s1(R(2,2))*psi_s2(R(3,3))- psi_s1(R(3,3))*psi_s2(R(2,2));
+    return detup*detdown;
+}
 
 
 /* Computes the local energy of a state defined by position matrix r, and distance matrix R.
