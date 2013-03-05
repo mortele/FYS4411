@@ -1,10 +1,14 @@
 #ifndef VARIATIONALLOOP_H
 #define VARIATIONALLOOP_H
 #include "variationalmc.h"
+#include "varmc.h"
 
 class VariationalLoop {
     private:
-        VariationalMC m;
+        //VariationalMC m;    // Importance sampled with closed form energy expression.
+        VarMC   m;          // Brute force with closed form energy expression.
+
+
         int     N;
         double  start;
         double  end;

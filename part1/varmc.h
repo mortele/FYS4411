@@ -22,6 +22,7 @@ class VarMC {
         double  beta;
         double  Z;
         double  stepSize;
+        vec dx;
 
         double computePsi(const mat &);
         double computeEnergy(mat &, mat &, double);
@@ -30,6 +31,7 @@ class VarMC {
         void   updateForDerivative(mat &, const mat &, int );
 
     public:
+        double acceptanceRatio;
         VarMC();
         double runMetropolis(double, double);
 };
