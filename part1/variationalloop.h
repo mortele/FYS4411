@@ -5,8 +5,8 @@
 
 class VariationalLoop {
     private:
-        //VariationalMC m;    // Importance sampled with closed form energy expression.
-        VarMC   m;          // Brute force with closed form energy expression.
+        VariationalMC m;    // Importance sampled with closed form energy expression.
+        //VarMC   m;          // Brute force with closed form energy expression.
 
 
         int     N;
