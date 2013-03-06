@@ -304,15 +304,16 @@ double VariationalMC::computeEnergyNumerical(mat &R, mat &r, double psi) {
             psil = computePsi(R);
 
             r(i,j) += h;
-
-            Evec(i,j) = computeDoubleDerivative(psil, psi, psih);
-            E2 -= computeDoubleDerivative(psil, psi, psih);
+            updateForDerivative(R, r, i);
+            psi2 = computePsi(R);
+            Evec(i,j) = computeDoubleDerivative(psil, psi2, psih);
+            E2 -= computeDoubleDerivative(psil, psi2, psih);
 
             psiLow(i,j) = psil;
             psiHigh(i,j) = psih;
 
             // set all values back to normal
-            updateForDerivative(R, r, i);
+
         }
     }
 //    cout << "E2 " << E2 << " E1 " << E1 << endl;
