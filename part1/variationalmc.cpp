@@ -1,8 +1,10 @@
 #include <armadillo>
 #include <time.h>
 #include <iomanip>
+#include <cmath>
 
 #include "variationalmc.h"
+#include "wavefunctions.h"
 #include "lib.cpp"
 
 
@@ -11,22 +13,24 @@ using namespace arma;
 
 /* VMC constructor. */
 VariationalMC::VariationalMC() :
-    nParticles  (2),
+    nParticles  (4),
     nDimensions (3),
-    nCycles     (10000000),
+    nCycles     (500),
     N       (2 * nCycles / 10),
     idum    (time(0)),
-    h       (0.0001),
+    h       (0.00001),
     h2      (h * h),
     alph    (1.0),
     alph2   (alph * alph),
     beta    (1.0),
-    Z       (2.0),
+    Z       (nParticles),
     stepSize(0.07),
     D       (0.5),
     dt      (0.0007),
-    dx      (zeros(nDimensions)) {
+    dx      (zeros(nDimensions)),
+    spins   (zeros(nParticles,nParticles)) {
 }
+
 
 /* Runs the Metropolis algorithm nCycles times. */
 double VariationalMC::runMetropolis(double alpha, double beta) {
@@ -54,15 +58,19 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
     double greensFunction  = 0.0;
 
     int    accepted        = 0;
-    // int    percent         = 0;
+    int    t               = 0;
 
     double randI;
     int    iRand;
 
-    // Fill coordinates arrays with random values.
+    // Fills the spin matrix with relevant values for Beryllium.
+    fillSpinMatrix(this->spins);
+
+    // Fill coordinates matrix with random values.
     for (int i = 0; i < nParticles; i++) {
         for (int j = 0; j < nDimensions; j++) {
-            coordinatesNew(i,j) = coordinatesOld(i,j) = (ran0(&idum)-0.5) / (0.5*alph);
+            coordinatesNew(i,j) = (ran0(&idum)-0.5) / (0.5*alph);
+            coordinatesOld(i,j) = coordinatesNew(i,j);
             // cout << coordinatesNew(i,j)  << endl;
         }
     }
@@ -74,8 +82,17 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
     // Compute the wave function in this initial state.
     oldWaveFunction = computePsi(Rnew);
 
-    //quantumForceOld = computeQuantumForce(Rnew, coordinatesNew, oldWaveFunction);
+    quantumForceOld = computeQuantumForce(Rnew, coordinatesNew, oldWaveFunction);
 
+    mat test = zeros<mat>(3,3);
+    int counter = 0;
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            test(i,j) = counter++;
+        }
+    }
+    cout <<test<< endl;
+    cout << inv(test) << endl;
 
     // Metropolis loop.
     for (int k = 0; k < nCycles; k++) {
@@ -86,16 +103,11 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
 
         for (int j = 0; j < nDimensions; j++) {
             // Brute force way:
-            coordinatesNew(iRand,j) += (ran0(&idum)-0.5) * stepSize;
+            // coordinatesNew(iRand,j) += (ran0(&idum)-0.5) * stepSize;
 
             // Importance sampled way:
-//            coordinatesNew(iRand, j) += gaussian_deviate(&idum) * sqrt(dt) +
-//                                      quantumForceOld(nDimensions*iRand+j) * dt; // * 2 * D;
-//            cout << "qforce=" << quantumForceOld(nDimensions*iRand+j) * dt << endl;
-//            cout << "normal="<<gaussian_deviate(&idum) * sqrt(dt) << endl;
-            //cout << "quantum="<<quantumForceOld(nDimensions*iRand+j) * dt << endl;
-            //cout << "r="<<coordinatesOld(iRand, j) << endl << endl;
-
+            coordinatesNew(iRand, j) += gaussian_deviate(&idum) * sqrt(dt) +
+                                      quantumForceOld(nDimensions*iRand+j) * dt; // * 2 * D;
         }
 
 
@@ -106,54 +118,78 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
         newWaveFunction = computePsi(Rnew);
 
         // Compute the quantum force in this new state.
-        //quantumForceNew = computeQuantumForce(Rnew, coordinatesNew, newWaveFunction);
+        quantumForceNew = computeQuantumForce(Rnew, coordinatesNew, newWaveFunction);
 
-        greensFunction = 0.0;
         // Compute the inside of the exponential term of the difference between Greens functions.
+        greensFunction = 0.0;
         for (int i = 0; i < nParticles; i++) {
             for (int j = 0; j < nDimensions; j++) {
-//                double pX = (coordinatesNew(i,j) - coordinatesOld(i,j) - D * dt * quantumForceOld(nDimensions*i+j));
-//                double pY = (coordinatesOld(i,j) - coordinatesNew(i,j) - D * dt * quantumForceNew(nDimensions*i+j));
-
-
-//                greensFunction -= -(pX*pX/(4*D*dt)) + (pY*pY / (4*D*dt));
-//                greensFunction += 0.5 * (quantumForceOld(nDimensions*i+j) + quantumForceNew(nDimensions*i+j)) *
-//                                  (D * dt * 0.5 * (quantumForceOld(nDimensions*i+j) - quantumForceNew(nDimensions*i+j)) -
-//                                  coordinatesNew(i,j) + coordinatesOld(i,j));
+                greensFunction += 0.5 * (quantumForceOld(nDimensions*i+j) +
+                                  quantumForceNew(nDimensions*i+j)) *
+                                  (D * dt * 0.5 * (quantumForceOld(nDimensions*i+j) -
+                                  quantumForceNew(nDimensions*i+j)) -
+                                  coordinatesNew(i,j) + coordinatesOld(i,j));
             }
         }
 
         // Compute the fraction GreensF(new) / GreensF(old).
         greensFunction = exp(greensFunction);
 
+
         //cout << greensFunction << endl;
 
         // Check if the suggested move is accepted, brute force way.
-        ecoeff = newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
+        // ecoeff = newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
 
         // Check if the suggested move is accepted, importance sampled way.
-        //ecoeff = greensFunction * newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
+        ecoeff = greensFunction * newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
 
+//        if (t==1) {
+//            cout << "R før metropolistest=" << Rnew << endl;
+//            cout << "psi=" << computePsi(Rnew) << endl;
+//            cout << "newWaveFunct=" << newWaveFunction << endl;
+//        }
         if (ecoeff > ran0(&idum)) {
+//            if (t==1) {
+//                cout << "R først i metropolistest=" << Rnew << endl;
+//                cout << "psi=" << computePsi(Rnew) << endl;
+//                cout << "newWaveFunct=" << newWaveFunction << endl;
+//            }
+
             accepted++;
             coordinatesOld.row(iRand) = coordinatesNew.row(iRand);
             quantumForceOld = quantumForceNew;
             oldWaveFunction = newWaveFunction;
 
+//            if (t==1) {
+//                cout << "R til slutt i  metropolistest=" << Rnew << endl;
+//                cout << "psi=" << computePsi(Rnew) << endl;
+//                cout << "newWaveFunct=" << newWaveFunction << endl;
+//                cout << "==================================================" << endl;
+//            }
             // Energy changes from previous state.
             // Closed form expressions for energy.
             //energy = computeEnergy(Rnew, coordinatesNew, newWaveFunction);
 
             // Numerical derivatives.
+            t= 0;
             energy = computeEnergyNumerical(Rnew, coordinatesNew, newWaveFunction);
         } else {
-            // ========================================================================================================================
-            // ========================================================================================================================
-            // ========================================================================================================================
-            // ========================================================================================================================
+            t = 1;
+//            if (t==1) {
+//                cout << "før update=" << Rnew << endl;
+//                cout << "psi=" << computePsi(Rnew) << endl;
+//                cout << "newWaveFunct=" << newWaveFunction << endl;
+//            }
             // ========================================================================================================================
             // TODO: her er det feil, kiser.
             coordinatesNew.row(iRand) = coordinatesOld.row(iRand);
+
+//            if (t==1) {
+//                cout << "R etter update=" << Rnew << endl;
+//                cout << "psi=" << computePsi(Rnew) << endl;
+//                cout << "newWaveFunct=" << newWaveFunction << endl;
+//            }
 
             // Energy remains unchanged.
         }
@@ -189,28 +225,34 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
 }
 
 
-/* Computes the wavefunction in a state defined by position matrix r. */
-double VariationalMC::computePsi(const mat &R) {
-
-    double returnVal = 0.0;
-    returnVal = exp(-alph * ( R(0,0) + R(1,1) ) + R(0,1) / (2 * (1  + beta * R(0,1)))); // ) * exp(
-    /*cout << "0,1= " << R(0,1) << endl;
-    cout << "r1= " << R(0,0) << endl;
-    cout << "r2= " << R(1,1) << endl;*/
-
-    //    for (int i = 0; i < nParticles; i++) {
-    //        for (int j = (i + 1); j < nParticles; j++) {
-    //            returnVal += (1 / R(i,j)) * exp(-alph * (R(i,i) + R(j,j))) * (exp(R(i,j)) / (1 + beta * R(i,j)));
-    //        }
-    //    }
+/* Old version of compute psi. */
+double VariationalMC::computePsi2(const mat &R) {
+    double returnVal = exp(-alph * ( R(0,0) + R(1,1) ) + R(0,1) / (2 * (1  + beta * R(0,1)))); // ) * exp(
     return returnVal;
 }
 
-//double VariationalMC::computePsi2(const mat &R) {
-//    double detup = psi_s1(R(0,0))*psi_s2(R(1,1))- psi_s1(R(1,1))*psi_s2(R(0,0));
-//    double detdown = psi_s1(R(2,2))*psi_s2(R(3,3))- psi_s1(R(3,3))*psi_s2(R(2,2));
-//    return detup*detdown;
-//}
+
+/* New version of compute psi. Slater determinands, bitches! */
+double VariationalMC::computePsi(const mat &R) {
+    // Compute the correlation part of the wave function.
+    double correlation = 0.0;
+    for (int i = 0; i < nParticles; i++) {
+        for (int j = (i+1); j < nParticles; j++) {
+            correlation += spins(i,j) * R(i,j) / (1 + beta * R(i,j));
+        }
+    }
+    correlation = exp(correlation);
+
+    // Compute the Slater determinand part of the wave function.
+    double detup   = psi_s1(R(0,0)) * psi_s2(R(1,1)) - psi_s1(R(1,1)) * psi_s2(R(0,0));
+    double detdown = psi_s1(R(2,2)) * psi_s2(R(3,3)) - psi_s1(R(3,3)) * psi_s2(R(2,2));
+
+//    cout << "correlation=" << correlation << endl;
+//    cout << "detup=" << detup << endl;
+//    cout << "detdown=" << detdown << endl;
+
+    return detup * detdown;
+}
 
 
 /* Computes the local energy of a state defined by position matrix r, and distance matrix R.
@@ -225,51 +267,6 @@ double VariationalMC::computeEnergy(mat &R, mat &r, double psi) {
     double E_L1 = (alph - Z) * (1 / R(0,0)  + 1 / R(1,1)) + 1 / R(0,1) - alph2; // (alph - Z) +  + 1 / R(0,1)
     double E_L2 = E_L1 + b3 * ( (alph * (R(0,0) + R(1,1))) / (R(0,1))  * (1 - (prikk / (R(0,0) * R(1,1)))) - b3 - 2 / R(0,1) + ((2*beta) / b2));
     return E_L2;
-
-
-
-
-    //double r1  = R(0,0);
-    //double r2  = R(1,1); HALLO
-//    double psil, psih;
-//    double E2  = 0;
-//    double E1  = 0;   // this is the commutative part of the
-//                                             // hamiltonian (we can just multiply it with psi.)
-//    for(int i = 0;i<nParticles; i++) {
-//        E1 -= Z/R(i,i);
-//        for(int j = i+1; j<nParticles; j++) {
-//            E1 += 1/R(i,j);
-//        }
-//    }
-
-//    for(int i = 0;i<nParticles; i++) {
-
-//        for(int j = 0; j<nDimensions;j++) {
-
-//            r(i,j) -= h; //r is the array of coordinates
-
-//            updateForDerivative(R,r, i);
-//            //cout << "r12=" << R(0,1)<<" for r-h" << endl;
-
-//            psil = computePsi(R);
-
-//            r(i,j)+=2*h;
-//            updateForDerivative(R, r, i);
-//            //cout << "r12=" << R(0,1)<<" for r+h" << endl;
-
-//            psih = computePsi(R);
-//            r(i,j)-=h;
-
-//            //cout << "psil, psi, psih = " << psil << " " << psi << " " << psih << endl;
-//            //cout << "ddx=" << (psil - 2 * psi + psih) / h2 << endl;
-//            E2-=computeDoubleDerivative(psil, psi,psih);
-//            //cout << "E2=" << E2 << endl;
-//            updateForDerivative(R, r, i);   // set all values back to normal
-//        }
-//    }
-//    //cout << "r12=" << R(0,1) << endl;
-//    //cout << E2 / psi << " " << E1 << endl;
-//    return E1 + E2 / (2 * psi);
 }
 
 
@@ -280,22 +277,22 @@ double VariationalMC::computeEnergyNumerical(mat &R, mat &r, double psi) {
     double r12 = R(0,1);
     double r1  = R(0,0);
     double r2  = R(1,1);
-    double E1  = -Z * ((1 / r1) + (1 / r2)) +  (1 / r12);   //this is the commutative part of the hamiltonian.
+    double E1  = 0;
     double E2  = 0;
+    double psi2, psi3;
 
-    mat Evec(nParticles,nDimensions);
-    mat psiLow(nParticles,nDimensions);
-    mat psiHigh(nParticles,nDimensions);
-    Evec.zeros();
-    psiLow.zeros();
-    psiHigh.zeros();
+    // Compute the commutative part of H.
+    for(int i = 0;i<nParticles; i++) {
+        E1 -= Z/R(i,i);
+        for(int j = i+1; j<nParticles; j++) {
+            E1 += 1/R(i,j);
+        }
+    }
 
     for(int i = 0; i<nParticles;i++){
         for(int j = 0; j<nDimensions;j++){
-            //cout << "h^2=" << h2 << endl;
-            //cout << "i,j=" << i << ", " << j << endl;
-
-            r(i,j) += h; //r is the array of coordinates
+            psi3 = computePsi(R);
+            r(i,j) += h;
             updateForDerivative(R, r, i);
             psih = computePsi(R);
 
@@ -303,27 +300,14 @@ double VariationalMC::computeEnergyNumerical(mat &R, mat &r, double psi) {
             updateForDerivative(R, r, i);
             psil = computePsi(R);
 
+            // Reset R back to oringial positions.
             r(i,j) += h;
             updateForDerivative(R, r, i);
+
             psi2 = computePsi(R);
-            Evec(i,j) = computeDoubleDerivative(psil, psi2, psih);
             E2 -= computeDoubleDerivative(psil, psi2, psih);
-
-            psiLow(i,j) = psil;
-            psiHigh(i,j) = psih;
-
-            // set all values back to normal
-
         }
     }
-//    cout << "E2 " << E2 << " E1 " << E1 << endl;
-    if (fabs(E2 / (2*psi) + E1) > 200) {
-        cout << endl<<"E2 for stor: "  << endl << "E2 / (2*psi) + E1= " <<E2 / (2*psi) + E1 << endl<< "e2=" << E2 << endl << "E1=" << E1 <<endl << "R="<< R << endl << "r=" << r << endl  << "d^2/dx^2 psi = " << Evec << endl << "psil - 2 * psi + psih=" <<psil - 2 * psi + psih << endl << "    r_12=" << R(0,1) << endl<<"closedForm=" << computeEnergy(R,r,psi) << endl << "psiL= " << psiLow << endl << "psiH =" << psiHigh << endl << "psi= " << psi <<endl <<endl;
-        cout << "================================================================================================================" << endl;
-//   } else if(fabs(E1) > 50) {
-  //    cout << "E2 for stor " << R << endl;
-    }
-//    cout << endl<<"E2 er akkurat passe stor: "  << endl << "e2/2psi= " << E2 / (2 * psi) << endl << "R="<< R << endl << "r=" << r << endl  << "d^2/dx^2 psi = " << Evec << endl << "psil - 2 * psi + psih=" <<psil - 2 * psi + psih << endl << "    r_12=" << R(0,1) << endl<<"closedForm=" << computeEnergy(R,r,psi) << endl << "psiL= " << psiLow << endl << "psiH =" << psiHigh << endl << "psi= " << psi <<endl <<endl;
     return E2 / (2 * psi) + E1;
 }
 
@@ -452,20 +436,39 @@ vec VariationalMC::computeQuantumForce(mat &R, mat &r, double psi) {
             r(k,o) -= h;
             updateForDerivative(R, r, k);
 
-            //cout << "psi= " << psi << "   psiLow=" << psiLow << "   psiHigh=" << psiHigh << endl;
             gradient(nDimensions*k+o) = computeFirstDerivative(psiLow, psiHigh);
         }
     }
-//    cout << gradient(1,0) << endl;
-//    gradient *= (2 / psi);
-//    cout << "psi= " << psi << endl;
-//    cout << gradient(1,0) << endl;
-    // cout << gradient << endl;
-
-    // greensfunction += 0.5∗(qforceold[i][j]+qforcenew[i][j]) ∗
-    //                   (D∗timestep∗0.5∗(qforceold[i][j] − qforcenew[i][j])−rnew[i][j]+rold[i][j]);
-
     return gradient;
 }
 
 
+double VariationalMC::psi_s1(double distance){
+    return exp(-alph*distance);
+}
+
+
+double VariationalMC::psi_s2(double distance){
+    return (1-alph*distance)*exp(-alph*distance/2);
+}
+
+
+void VariationalMC::fillSpinMatrix(mat& spin) {
+    // Set which electrons have spins up, and which have spins down.
+    vec electronSpins(nParticles);
+    electronSpins.zeros();
+    for (int i = 0; i < (nParticles / 2); i++) {
+        electronSpins(i) = 1;
+    }
+
+    // Set the electron-electron spin interaction matrix.
+    for (int i = 0; i < nParticles; i++) {
+        for (int j = i+1; j < nParticles; j++) {
+            if (electronSpins(i) != electronSpins(j)) {
+                spin(i,j) = 0.5;
+            } else {
+                spin(i,j) = 0.25;
+            }
+        }
+    }
+}

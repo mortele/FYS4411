@@ -1,7 +1,6 @@
 #include "wavefunctions.h"
 
-WaveFunctions::WaveFunctions()
-{
+WaveFunctions::WaveFunctions() {
 
 }
 

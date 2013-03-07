@@ -8,7 +8,7 @@ VariationalLoop::VariationalLoop() {
 }
 
 void VariationalLoop::initialize_helium() {
-    this->N     = 100;
+    this->N     = 10;
     this->start = 0.9;
     this->end   = 2.1;
     this->E     = 0.0;
@@ -29,8 +29,8 @@ void VariationalLoop::run() {
             startClock = clock();
             b = start + ((end-start)/N) * k;
             a = start + ((end-start)/N) * j;
-a = 1.85;
-b = 0.35;
+            a = 3.5;
+            b = 0.25;
             cout << "/-------------------------------------------------------------\\" << endl;
             printf("|   For parameters:    a = %8.4f,   and    b = %8.4f    |\n", a, b);
             cout << "\\-------------------------------------------------------------/" << endl;
