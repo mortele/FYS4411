@@ -452,6 +452,26 @@ double VariationalMC::psi_s2(double distance){
     return (1-alph*distance)*exp(-alph*distance/2);
 }
 
+void VariationalMC::updateSlaterInverse(mat& slaternew, const mat& slaterold, int particle, double R) {
+    for (int i = 0;i<nParticles/2; i++) {
+        for (int j = 0; j<nParticles/2; j++) {
+            if(j != particle) {
+                double sum = 0;
+                for( int l = 0; l< nParticles; l++) {
+                    sum +=slaternew(particle, l)*slaterold(l, j);
+                }
+                slaternew(i,j) = slaterold(i,j) - slaterold(i,particle)*sum/R;
+            }
+            else {
+                double sum = 0;
+                for( int l = 0; l< nParticles; l++) {
+                    sum +=slaterold(particle, l)*slaterold(l, j);
+                }
+                slaternew(i,j) = slaterold(i,particle)*sum/R;
+            }
+        }
+    }
+}
 
 void VariationalMC::fillSpinMatrix(mat& spin) {
     // Set which electrons have spins up, and which have spins down.
