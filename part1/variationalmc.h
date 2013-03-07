@@ -38,9 +38,14 @@ class VariationalMC {
         double  gaussian_deviate(long* idum);
         double  psi_s1(double);
         double  psi_s2(double);
+        double  computeSlaterRatio(const mat&, double, int);
+        double  slaterPsi(double, int);
+        double  computeCorrelation(const mat&);
         void    updateRmatrix(const mat&, mat&);
         void    updateForDerivative(mat&, const mat&, int );
         void    fillSpinMatrix(mat&);
+        void    updateSlaterInverse(mat&, const mat&, const mat&, const mat&, int, double);
+        void     evaluateSlater(mat&, mat&, int);
         vec     computeQuantumForce(mat&, mat&, double);
 
     public:
