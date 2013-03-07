@@ -1,8 +1,8 @@
 #include <armadillo>
 #include "functions.h"
 
-//using namespace std;
-//using namespace arma;
+using namespace std;
+using namespace arma;
 
 ////calculates the wavefunction value at a point
 //double psi(double *coordinates)
