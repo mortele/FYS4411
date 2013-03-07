@@ -2,6 +2,7 @@
 #define VARIATIONALMC_H
 
 #include <armadillo>
+#include "wavefunctions.h"
 
 using namespace std;
 using namespace arma;
@@ -24,6 +25,8 @@ class VariationalMC {
         double  D;
         double  dt;
         vec     dx;
+        mat     spins;
+        WaveFunctions waveFunc;
 
 
         double  computePsi(const mat&);
@@ -33,8 +36,11 @@ class VariationalMC {
         double  computeDoubleDerivative(double, double, double);
         double  computeFirstDerivative (double, double);
         double  gaussian_deviate(long* idum);
+        double  psi_s1(double);
+        double  psi_s2(double);
         void    updateRmatrix(const mat&, mat&);
         void    updateForDerivative(mat&, const mat&, int );
+        void    fillSpinMatrix(mat&);
         vec     computeQuantumForce(mat&, mat&, double);
 
     public:
