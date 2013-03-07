@@ -15,7 +15,7 @@ using namespace arma;
 VariationalMC::VariationalMC() :
     nParticles  (4),
     nDimensions (3),
-    nCycles     (500),
+    nCycles     (500000),
     N       (2 * nCycles / 10),
     idum    (time(0)),
     h       (0.00001),
@@ -71,7 +71,6 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
         for (int j = 0; j < nDimensions; j++) {
             coordinatesNew(i,j) = (ran0(&idum)-0.5) / (0.5*alph);
             coordinatesOld(i,j) = coordinatesNew(i,j);
-            // cout << coordinatesNew(i,j)  << endl;
         }
     }
 
@@ -83,16 +82,6 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
     oldWaveFunction = computePsi(Rnew);
 
     quantumForceOld = computeQuantumForce(Rnew, coordinatesNew, oldWaveFunction);
-
-    mat test = zeros<mat>(3,3);
-    int counter = 0;
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            test(i,j) = counter++;
-        }
-    }
-    cout <<test<< endl;
-    cout << inv(test) << endl;
 
     // Metropolis loop.
     for (int k = 0; k < nCycles; k++) {

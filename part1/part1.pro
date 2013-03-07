@@ -29,3 +29,4 @@ release {
     QMAKE_CXXFLAGS_RELEASE -= -O2
     QMAKE_CXXFLAGS_RELEASE += -O3
 }
+LIBS+= -larmadillo -lblas -llapack
