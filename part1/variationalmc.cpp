@@ -24,9 +24,9 @@ VariationalMC::VariationalMC() :
     alph2   (alph * alph),
     beta    (1.0),
     Z       (nParticles),
-    stepSize(0.007),
+    stepSize(0.000000001),
     D       (0.5),
-    dt      (0.003), // 0.0007
+    dt      (0.03), // 0.0007
     dx      (zeros(nDimensions)),
     spins   (zeros(nParticles,nParticles)) {
 }
@@ -135,7 +135,7 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
 
             // Importance sampled way:
             //coordinatesNew(iRand, j) += gaussian_deviate(&idum) * sqrt(dt) +
-            //                          quantumForceOld(nDimensions*iRand+j) * dt; // * 2 * D;
+               //                       quantumForceOld(nDimensions*iRand+j) * dt; // * 2 * D;
         }
 
 
@@ -144,22 +144,22 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
         newWaveFunction = computePsi(Rnew);
 
         // Compute the quantum force in this new state.
-        //quantumForceNew = computeQuantumForce(Rnew, coordinatesNew, newWaveFunction);
+//        quantumForceNew = computeQuantumForce(Rnew, coordinatesNew, newWaveFunction);
 
-        // Compute the inside of the exponential term of the difference between Greens functions.
-        greensFunction = 0.0;
-        for (int i = 0; i < nParticles; i++) {
-            for (int j = 0; j < nDimensions; j++) {
-                greensFunction += 0.5 * (quantumForceOld(nDimensions*i+j) +
-                                  quantumForceNew(nDimensions*i+j)) *
-                                  (D * dt * 0.5 * (quantumForceOld(nDimensions*i+j) -
-                                  quantumForceNew(nDimensions*i+j)) -
-                                  coordinatesNew(i,j) + coordinatesOld(i,j));
-            }
-        }
+//        // Compute the inside of the exponential term of the difference between Greens functions.
+//        greensFunction = 0.0;
+//        for (int i = 0; i < nParticles; i++) {
+//            for (int j = 0; j < nDimensions; j++) {
+//                greensFunction += 0.5 * (quantumForceOld(nDimensions*i+j) +
+//                                  quantumForceNew(nDimensions*i+j)) *
+//                                  (D * dt * 0.5 * (quantumForceOld(nDimensions*i+j) -
+//                                  quantumForceNew(nDimensions*i+j)) -
+//                                  coordinatesNew(i,j) + coordinatesOld(i,j));
+//            }
+//        }
 
-        // Compute the fraction GreensF(new) / GreensF(old).
-        greensFunction = exp(greensFunction);
+//        // Compute the fraction GreensF(new) / GreensF(old).
+//        greensFunction = exp(greensFunction);
 
         // Check if the suggested move is accepted, brute force way.
         // ecoeff = newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
@@ -181,8 +181,8 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
         // Check if the suggested move is accepted, importance sampled way.
         // ecoeff =greensFunction * newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
 
-        ecoeff = R * R;
-
+        ecoeff =  R * R;
+        //cout << ecoeff << endl;
         if (ecoeff > ran0(&idum)) {
             // Accept new step, calculate new energy.
             accepted++;
@@ -190,8 +190,9 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
             quantumForceOld = quantumForceNew;
             oldWaveFunction = newWaveFunction;
             correlationOld  = correlationNew;
+            Rold = Rnew;
             //energy          = computeEnergyNumerical(Rnew, coordinatesNew, newWaveFunction);
-            cout << slaterNewDown << endl;
+            //cout << slaterNewUp << endl;
 
             // Check which slater determinand we need to change -- up or down.
             if (iRand > (nParticles/2)) {
@@ -202,26 +203,28 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
 //                slaterNewDown = slaterNewDown.i();
 //                cout << "inv=" <<slaterNewDown << endl;
 //                cout << "R=" << Rnew << endl;
+                slaterOldDown = slaterNewDown;
 
             } else {
                 // Up part.
                 updateSlaterInverse(slaterNewUp, slaterOldUp, Rnew, Rold, iRand, 0, R);
 //                evaluateSlater(slaterNewUp, Rnew,0);
 //                slaterNewUp = slaterNewUp.i();
+                slaterOldUp = slaterNewUp;
             }
-            // Compute the intial energy.
+
+            // Compute the energy.
             energyUp   = computeKineticEnergyClosedForm(Rnew,coordinatesNew,slaterNewUp, 0);
             energyDown = computeKineticEnergyClosedForm(Rnew,coordinatesNew,slaterNewDown, 1);
             energyPot  = computePotentialEnergyClosedForm(Rnew);
-            energy = energyUp + energyDown+ energyPot;
-            //cout << energyUp + energyDown << endl;
-            energy = computeEnergyNumerical(Rnew, coordinatesNew, computePsi(Rnew));
+            energy = energyUp + energyDown + energyPot;
+            //cout << ecoeff << endl;
+            //energy = computeEnergyNumerical(Rnew, coordinatesNew, computePsi(Rnew));
 
 
         } else {
             // Reject suggested step, energy remains as before.
             coordinatesNew.row(iRand) = coordinatesOld.row(iRand);
-
             // Check which slater determinand we need to change -- up or down.
             if (iRand > (nParticles/2)) {
                 // Down part.
@@ -307,6 +310,7 @@ double VariationalMC::computeKineticEnergyClosedForm(const mat& R, const mat& r,
             returnVal += psiDoubleDerivative(R(i+2*k,i+2*k), j) * slater(j,i);
         }
     }
+    //cout << "slaterkin = " << returnVal /(-2.0) << endl;
     return returnVal / (-2.0);
 }
 
@@ -530,7 +534,7 @@ double VariationalMC::psiDoubleDerivative(double distance, int j) {
         return psi_s2_doubleDerivative(distance);
     } else {
         return 0;
-        cout << "hei" << j  << endl;
+        cout << "Error in psiDoubleDerivative" << j  << endl;
     }
 }
 
@@ -552,7 +556,7 @@ double VariationalMC::slaterPsi(double distance, int j) {
         return psi_s2(distance);
     } else {
         return 0;
-        cout << "hei" << j<< endl;
+        cout << "Error is slaterPsi" << j<< endl;
     }
 }
 
