@@ -32,15 +32,28 @@ class VariationalMC {
         double  computePsi(const mat&);
         double  computePsi2(const mat&);
         double  computeEnergy(mat&, mat&, double);
+        double  computeKineticEnergyClosedForm(const mat&, const mat&, const mat&);
+        double  computePotentialEnergyClosedForm(const mat&);
         double  computeEnergyNumerical(mat&, mat&, double);
         double  computeDoubleDerivative(double, double, double);
         double  computeFirstDerivative (double, double);
         double  gaussian_deviate(long* idum);
         double  psi_s1(double);
         double  psi_s2(double);
+        double  psi_s1_derivative(double);
+        double  psi_s2_derivative(double);
+        double  psi_s1_doubleDerivative(double);
+        double  psi_s2_doubleDerivative(double);
+        double  computeSlaterRatio(const mat&, double, int);
+        double  slaterPsi(double, int);
+        double  psiDerivative(double, int);
+        double  psiDoubleDerivative(double, int);
+        double  computeCorrelation(const mat&);
         void    updateRmatrix(const mat&, mat&);
         void    updateForDerivative(mat&, const mat&, int );
         void    fillSpinMatrix(mat&);
+        void    updateSlaterInverse(mat&, const mat&, const mat&, const mat&, int, double);
+        void     evaluateSlater(mat&, mat&, int);
         vec     computeQuantumForce(mat&, mat&, double);
 
     public:
@@ -49,3 +62,4 @@ class VariationalMC {
 };
 
 #endif // VARIATIONALMC_H
+
