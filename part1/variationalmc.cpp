@@ -509,12 +509,12 @@ double VariationalMC::psi_s2(double distance){
     return (1-alph*distance/2.)*exp(-alph*distance/2);
 }
 
-double VariationalMC::psi_s1_derivative(double distance) {
-
+double VariationalMC::psi_s1_derivative(double distance, double coord) { //distance is r, coord is x,y or z
+    return -alph*coord*exp(-alph*distance)/distance;
 }
 
-double VariationalMC::psi_s2_derivative(double distance) {
-
+double VariationalMC::psi_s2_derivative(double distance, double coord) { //distance is r, coord is x,y or z
+    return 1/4.*alph*(alph*distance - 4)*coord *exp(-alph*distance/2)/distance;
 }
 
 double VariationalMC::psi_s1_doubleDerivative(double distance) {
@@ -525,8 +525,31 @@ double VariationalMC::psi_s2_doubleDerivative(double distance) {
     return (5.0/4.0 * alph2 - 2 * alph / distance - alph2*alph * distance / 8.) * exp(-alph * distance / 2.);
 }
 
-double VariationalMC::psiDerivative(double distance, int j) {
+void VariationalMC::computeSlaterGradient(mat &R, mat &r, mat& slater,mat gradient, double R2, int particle) {
 
+    //vec gradient(nDimensions*nParticles);
+
+    int k = particle %2; //the rest
+    for (int o = 0; o < nDimensions; o++) {
+        double sum = 0;
+        for (int j = 0; j < (nParticles / 2); j++) {
+            sum += psiDerivative(R(particle,particle),r(particle,o), j)*slater(j,particle);
+        }
+        gradient(nDimensions*particle+o) = 1/R2 *sum;
+    }
+
+    //return gradient;
+}
+
+double VariationalMC::psiDerivative(double distance, double coord, int j) {
+    if (j == 0) {
+        return psi_s1_derivative(distance,coord);
+    } else if (j == 1) {
+        return psi_s2_derivative(distance,coord);
+    } else {
+        return 0;
+        cout << "Error in psiDerivative" << j  << endl;
+    }
 }
 
 double VariationalMC::psiDoubleDerivative(double distance, int j) {
