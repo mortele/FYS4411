@@ -32,7 +32,7 @@ class VariationalMC {
         double  computePsi(const mat&);
         double  computePsi2(const mat&);
         double  computeEnergy(mat&, mat&, double);
-        double  computeKineticEnergyClosedForm(const mat&, const mat&, const mat&);
+        double  computeKineticEnergyClosedForm(const mat&, const mat&, const mat&, int);
         double  computePotentialEnergyClosedForm(const mat&);
         double  computeEnergyNumerical(mat&, mat&, double);
         double  computeDoubleDerivative(double, double, double);
@@ -52,8 +52,8 @@ class VariationalMC {
         void    updateRmatrix(const mat&, mat&);
         void    updateForDerivative(mat&, const mat&, int );
         void    fillSpinMatrix(mat&);
-        void    updateSlaterInverse(mat&, const mat&, const mat&, const mat&, int, double);
-        void     evaluateSlater(mat&, mat&, int);
+        void    updateSlaterInverse(mat&, const mat&, const mat&, const mat&, int, int, double);
+        void    evaluateSlater(mat&, mat&, int);
         vec     computeQuantumForce(mat&, mat&, double);
 
     public:
