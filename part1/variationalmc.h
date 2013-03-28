@@ -54,8 +54,13 @@ class VariationalMC {
         void    fillSpinMatrix(mat&);
         void    updateSlaterInverse(mat&, const mat&, const mat&, const mat&, int, int, double);
         void    evaluateSlater(mat&, mat&, int);
-        vec     computeQuantumForce(mat&, mat&, double);
+        //vec     computeQuantumForce(mat&, mat&, double);
         void    computeSlaterGradient(mat&, mat&, mat& , mat &, double, int);
+        void    computeJastrowGradient(const mat& , mat&, int);
+        double  computeRc( const mat& ,const mat&, int);
+        void    updateCorrelationsMatrix( mat& ,const mat&,const mat&,int);
+        void    fillCorrelationsMatrix( mat&,const mat&,const mat& );
+        void    computeQuantumForce(mat &, mat &, mat &, mat &, mat &);
 
     public:
         VariationalMC();
