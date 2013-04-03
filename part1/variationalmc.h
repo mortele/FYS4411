@@ -57,11 +57,12 @@ class VariationalMC {
         //vec     computeQuantumForce(mat&, mat&, double);
         void    computeSlaterGradient(mat&, mat&, mat& , mat &, double, int);
         void    computeJastrowGradient(const mat& , mat&, int);
+        void    computeJastrowLaplacian(const mat& , mat&, int);
         double  computeRc( const mat& ,const mat&, int);
         void    updateCorrelationsMatrix( mat& ,const mat&,const mat&,int);
         void    fillCorrelationsMatrix( mat&,const mat&,const mat& );
-        void    computeQuantumForce(mat &, mat &, mat &, mat &, mat &);
-
+        void    computeQuantumForce(mat &, mat &, mat &, mat &, mat &, double &);
+        void    computeJastrowEnergy(const mat& , mat& , mat& );
     public:
         VariationalMC();
         double runMetropolis(double, double);
