@@ -15,7 +15,7 @@ using namespace arma;
 VariationalMC::VariationalMC() :
     nParticles  (4),
     nDimensions (3),
-    nCycles     (500000),
+    nCycles     (1),
     N       (2 * nCycles / 10),
     idum    (time(0)),
     h       (0.00001),
@@ -26,7 +26,7 @@ VariationalMC::VariationalMC() :
     Z       (nParticles),
     stepSize(0.001),
     D       (0.5),
-    dt      (0.003), // 0.0007
+    dt      (0.03), // 0.0007
     dx      (zeros(nDimensions)),
     spins   (zeros(nParticles,nParticles)) {
 }
@@ -44,7 +44,6 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
     mat coordinatesOld  = zeros<mat>(nParticles, nDimensions);
     mat Rnew            = zeros<mat>(nParticles, nParticles);   // Matrix of distances and magnitudes.
     mat Rold            = zeros<mat>(nParticles, nParticles);
-    mat slater          = zeros<mat>(nParticles/2, nParticles/2);
     mat slaterOldUp     = zeros<mat>(nParticles/2, nParticles/2);
     mat slaterOldDown   = zeros<mat>(nParticles/2, nParticles/2);
     mat slaterNewUp     = zeros<mat>(nParticles/2, nParticles/2);
@@ -93,7 +92,7 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
     // Fill coordinates matrix with random values.
     for (int i = 0; i < nParticles; i++) {
         for (int j = 0; j < nDimensions; j++) {
-            coordinatesNew(i,j) = (ran0(&idum)-0.5) / (0.5*alph);
+            coordinatesNew(i,j) = (ran0(&idum)-0.5) * 20.0/ (alph);
             coordinatesOld(i,j) = coordinatesNew(i,j);
         }
     }
@@ -124,23 +123,19 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
 
     energyPot = computePotentialEnergyClosedForm(Rnew);
     energy = energyUp + energyDown + energyPot;
-    //cout << energyUp + energyDown + energyPot<< endl;
+    //cout << energy << endl;
 
     // Compute the correlation factor in the initial state.
     correlationOld  = computeCorrelation(Rnew);
 
-    // Compute the wave function in this initial state.
-    oldWaveFunction = computePsi(Rnew);
 
-    // Compute the quantum force in the intial state.
-    //quantumForceOld = computeQuantumForce(Rnew, coordinatesNew, oldWaveFunction);
 
     for (int i=0; i<nParticles; i++) {
         if (i>=nParticles/2) {
             computeSlaterGradient(Rnew, coordinatesNew,slaterOldDown, slaterGradient,1, i);
         }
         else {
-            computeSlaterGradient(Rnew, coordinatesNew,slaterOldUp, slaterGradient,1, i);
+            computeSlaterGradient(Rnew, coordinatesNew,  slaterOldUp, slaterGradient,1, i);
         }
 
         computeJastrowGradient(Rnew, jastrowGradient, i);
@@ -150,8 +145,7 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
     jastrowLaplacianOld = jastrowLaplacian;
     slaterGradientOld = slaterGradient;
     computeQuantumForce(quantumForceNew, Rnew,coordinatesNew, jastrowGradient, slaterGradient, energycrossterm);
-    quantumForceOld = quantumForceNew;
-
+    computeQuantumForce(quantumForceOld, Rnew, coordinatesNew, jastrowGradient, slaterGradient, energycrossterm);
     // Metropolis loop.
     for (int k = 0; k < nCycles; k++) {
 
@@ -187,7 +181,6 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
 //                                  coordinatesNew(i,j) + coordinatesOld(i,j));
 //            }
 //        }
-
 //        // Compute the fraction GreensF(new) / GreensF(old).
 //        greensFunction = exp(greensFunction);
 
@@ -211,7 +204,7 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
         computeJastrowGradient(Rnew, jastrowGradient, iRand);
         computeJastrowLaplacian(Rnew, jastrowLaplacian, iRand);
         computeQuantumForce(quantumForceNew, Rnew, coordinatesNew, jastrowGradient, slaterGradient, energycrossterm);
-
+        cout << slaterGradientOld << endl;
 
         // Compute the inside of the exponential term of the difference between Greens functions.
         greensFunction = 0.0;
@@ -222,6 +215,7 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
                         (D * dt * 0.5* (quantumForceOld(i,j) -
                                          quantumForceNew(i,j)) -
                          coordinatesNew(i,j) + coordinatesOld(i,j));
+                //cout << greensFunction << endl;
             }
         }
 
@@ -233,13 +227,12 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
         // ecoeff =greensFunction * newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
 
         ecoeff =  R * R * greensFunction;
-        //cout << ecoeff << endl;
+        //cout << greensFunction << endl;
         if (ecoeff > ran0(&idum)) {
             // Accept new step, calculate new energy.
             accepted++;
             coordinatesOld.row(iRand) = coordinatesNew.row(iRand);
             quantumForceOld = quantumForceNew;
-            oldWaveFunction = newWaveFunction;
             correlationOld  = correlationNew;
             slaterGradientOld = slaterGradient;
             jastrowGradientOld = jastrowGradient;
@@ -283,6 +276,7 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
             slaterGradient = slaterGradientOld;
             jastrowGradient = jastrowGradientOld;
             jastrowLaplacian = jastrowLaplacianOld;
+            quantumForceNew = quantumForceOld;
             Rnew = Rold;
             // Check which slater determinand we need to change -- up or down.
             if (iRand >= (nParticles/2)) {
@@ -621,7 +615,8 @@ void VariationalMC::computeSlaterGradient(mat &Rnew, mat &r, mat& slater,mat& gr
         for (int j = 0; j < (nParticles / 2); j++) {
             sum += psiDerivative(Rnew(particle,particle),r(particle,o), j)*slater(j,k);
         }
-        gradient(particle,o) = 1/(R*R) *sum;
+        gradient(particle,o) = 1.0/R *sum;
+        //cout << gradient(particle,o) << endl;
     }
 }
 
@@ -632,7 +627,7 @@ double VariationalMC::psiDerivative(double distance, double coord, int j) {
         return psi_s2_derivative(distance,coord);
     } else {
         return 0;
-        cout << "Error in psiDerivative" << j  << endl;
+        cout << "Error in psiDerivative: j = " << j  << endl;
     }
 }
 
@@ -643,7 +638,7 @@ double VariationalMC::psiDoubleDerivative(double distance, int j) {
         return psi_s2_doubleDerivative(distance);
     } else {
         return 0;
-        cout << "Error in psiDoubleDerivative" << j  << endl;
+        cout << "Error in psiDoubleDerivative: j = " << j  << endl;
     }
 }
 
