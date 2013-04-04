@@ -62,7 +62,7 @@ class VariationalMC {
         void    updateCorrelationsMatrix( mat& ,const mat&,const mat&,int);
         void    fillCorrelationsMatrix( mat&,const mat&,const mat& );
         void    computeQuantumForce(mat &, mat &, mat &, mat &, mat &, double &);
-        void    computeJastrowEnergy(const mat& , mat& , mat& );
+        double computeJastrowEnergy(const mat& , mat& , mat& );
     public:
         VariationalMC();
         double runMetropolis(double, double);

@@ -15,7 +15,7 @@ using namespace arma;
 VariationalMC::VariationalMC() :
     nParticles  (4),
     nDimensions (3),
-    nCycles     (500000),
+    nCycles     (1000000),
     N       (2 * nCycles / 10),
     idum    (time(0)),
     h       (0.00001),
@@ -24,9 +24,9 @@ VariationalMC::VariationalMC() :
     alph2   (alph * alph),
     beta    (1.0),
     Z       (nParticles),
-    stepSize(0.0001),
+    stepSize(0.01),
     D       (0.5),
-    dt      (0.03), // 0.0007
+    dt      (0.01), // 0.0007
     dx      (zeros(nDimensions)),
     spins   (zeros(nParticles,nParticles)) {
 }
@@ -77,6 +77,7 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
     double energyDown      = 0.0;
     double energyPot       = 0.0;
     double energycrossterm = 0.0;
+    double energyJas       = 0.0;
 
     double greensFunction  = 0.0;
 
@@ -92,7 +93,7 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
     // Fill coordinates matrix with random values.
     for (int i = 0; i < nParticles; i++) {
         for (int j = 0; j < nDimensions; j++) {
-            coordinatesNew(i,j) = (ran0(&idum)-0.5) * 10.0/ (alph);
+            coordinatesNew(i,j) = gaussian_deviate(&idum) * 3.0/ (alph);
             coordinatesOld(i,j) = coordinatesNew(i,j);
         }
     }
@@ -159,13 +160,13 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
 
             // Importance sampled way:
             coordinatesNew(iRand, j) += gaussian_deviate(&idum) * sqrt(dt) +
-                                     quantumForceOld(iRand,j) * dt; // * 2 * D;
+                                     quantumForceOld(iRand,j) * dt * D; // * 2 * D;
         }
 
 
         // Compute the wavefunction in this new state.
         updateForDerivative(Rnew, coordinatesNew,iRand); // updates R.
-        //newWaveFunction = computePsi(Rnew);
+
 
         // Compute the quantum force in this new state.
 //        quantumForceNew = computeQuantumForce(Rnew, coordinatesNew, newWaveFunction);
@@ -187,59 +188,63 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
 
         updateCorrelationsMatrix(correlationsNew, Rnew, spins, iRand);
         double Rc = computeRc(correlationsOld, correlationsNew, iRand);
+
+
         //cout << Rc << endl;
+
         if (iRand >= (nParticles/2)) {
             // Down part.
-            R = computeSlaterRatio(slaterOldDown, Rnew(iRand,iRand), iRand-(nParticles/2)); // *Rc
-            //computeSlaterGradient(Rnew, coordinatesNew,slaterOldDown, slaterGradient,R, iRand);
+            Rsd = computeSlaterRatio(slaterOldDown, Rnew(iRand,iRand), iRand-(nParticles/2)); // *Rc
+            computeSlaterGradient(Rnew, coordinatesNew,slaterOldDown, slaterGradient,Rsd, iRand);
         } else {
             // Up part.
-            R = computeSlaterRatio(slaterOldUp, Rnew(iRand,iRand), iRand);  // *Rc
-            //computeSlaterGradient(Rnew, coordinatesNew,slaterOldUp, slaterGradient,R, iRand);
+            Rsd = computeSlaterRatio(slaterOldUp, Rnew(iRand,iRand), iRand);  // *Rc
+            computeSlaterGradient(Rnew, coordinatesNew,slaterOldUp, slaterGradient,Rsd, iRand);
         }
-        for (int i=0; i<nParticles; i++) {
-            if (i>=nParticles/2) {
-                computeSlaterGradient(Rnew, coordinatesNew,slaterOldDown, slaterGradient,R, i);
-            }
-            else {
-                computeSlaterGradient(Rnew, coordinatesNew,  slaterOldUp, slaterGradient,R, i);
-            }
-        }
-//        correlationNew = computeCorrelation(Rnew);
-//        R = Rsd * correlationNew / correlationOld;
 
         computeJastrowGradient(Rnew, jastrowGradient, iRand);
         computeJastrowLaplacian(Rnew, jastrowLaplacian, iRand);
         computeQuantumForce(quantumForceNew, Rnew, coordinatesNew, jastrowGradient, slaterGradient, energycrossterm);
-        //cout << slaterGradientOld << endl;
+        computeQuantumForce(quantumForceOld, Rold, coordinatesOld, jastrowGradient, slaterGradientOld, energycrossterm);
 
         // Compute the inside of the exponential term of the difference between Greens functions.
         greensFunction = 0.0;
-        for (int i = 0; i < nParticles; i++) {
+
+        for (int i = 0;i < nParticles; i++) {
             for (int j = 0; j < nDimensions; j++) {
                 greensFunction += 0.5* (quantumForceOld(i,j) +
-                                         quantumForceNew(i,j)) *
+                                        quantumForceNew(i,j)) *
                         (D * dt * 0.5* (quantumForceOld(i,j) -
-                                         quantumForceNew(i,j)) -
+                                        quantumForceNew(i,j)) -
                          coordinatesNew(i,j) + coordinatesOld(i,j));
                 //cout << greensFunction << endl;
             }
         }
 
+
         // Compute the fraction GreensF(new) / GreensF(old).
         greensFunction = exp(greensFunction);
-
-
-        // Check if the suggested move is accepted, importance sampled way.
-        // ecoeff =greensFunction * newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
-
+        //cout << greensFunction << endl;
+        R= Rsd*Rc;
+        // Check if the suggested move is accepted
         ecoeff =  R * R * greensFunction;
-        //cout << R << endl;
+//        if (greensFunction<1e-5) {
+//            cout << iRand << endl;
+//            cout << greensFunction << endl;
+//            cout << slaterGradient << endl;
+//            cout << quantumForceNew << endl;
+//            cout << coordinatesNew << endl;
+//            cout << coordinatesOld << endl;
+//            cout << slaterGradientOld << endl;
+//            cout << quantumForceOld << endl;
+//        }
+
+
         if (ecoeff > ran0(&idum)) {
             // Accept new step, calculate new energy.
             accepted++;
             coordinatesOld.row(iRand) = coordinatesNew.row(iRand);
-            quantumForceOld = quantumForceNew;
+            quantumForceOld = quantumForceNew;           
             correlationOld  = correlationNew;
             slaterGradientOld = slaterGradient;
             jastrowGradientOld = jastrowGradient;
@@ -249,11 +254,11 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
             // Check which slater determinand we need to change -- up or down.
             if (iRand >= (nParticles/2)) {
                 // Down part.
-                updateSlaterInverse(slaterNewDown, slaterOldDown, Rnew, Rold, iRand -nParticles/2, 1, R);
+                updateSlaterInverse(slaterNewDown, slaterOldDown, Rnew, Rold, iRand -nParticles/2, 1, Rsd);
                 slaterOldDown = slaterNewDown;
             } else {
                 // Up part.
-                updateSlaterInverse(slaterNewUp, slaterOldUp, Rnew, Rold, iRand, 0, R);
+                updateSlaterInverse(slaterNewUp, slaterOldUp, Rnew, Rold, iRand, 0, Rsd);
                 slaterOldUp = slaterNewUp;
 //                mat slatertest = zeros<mat>(nParticles/2, nParticles/2);
 //                evaluateSlater(slatertest, Rnew,0);
@@ -265,23 +270,24 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
             }
             Rold = Rnew;
 
-
             // Compute the energy.
             energyUp   = computeKineticEnergyClosedForm(Rnew,coordinatesNew,slaterNewUp, 0);
             energyDown = computeKineticEnergyClosedForm(Rnew,coordinatesNew,slaterNewDown, 1);
             energyPot  = computePotentialEnergyClosedForm(Rnew);
-            energy = energyUp + energyDown + energyPot;
-            //energy = computeEnergyNumerical(Rnew, coordinatesNew, computePsi(Rnew));
-
+            energyJas  = computeJastrowEnergy(Rnew, jastrowLaplacian, jastrowGradient);
+            energy = energyUp + energyDown + energyPot + energyJas + energycrossterm;
 
         } else {
+
+
             // Reject suggested step, energy remains as before.
             coordinatesNew.row(iRand) = coordinatesOld.row(iRand);
+
             slaterGradient = slaterGradientOld;
             jastrowGradient = jastrowGradientOld;
             jastrowLaplacian = jastrowLaplacianOld;
-            quantumForceNew = quantumForceOld;
             Rnew = Rold;
+            //cout << "not accepted bitch!!" << endl;
             // Check which slater determinand we need to change -- up or down.
 //            if (iRand >= (nParticles/2)) {
 //                // Down part.
@@ -290,6 +296,7 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
 //                // Up part.
 //                slaterNewUp = slaterOldUp;
 //            }
+
 
         }
 
@@ -304,20 +311,21 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
         if (k == N) {
             energySum  = 0.0;
             energy2Sum = 0.0;
+            accepted   = 0;
         }
 
 
     }
 
     // Calculate the expected value of the energy, the energy squared, and the variance.
-    energy  = energySum  / (nCycles - N);
-    energy2 = energy2Sum / (nCycles - N);
+    energy  = energySum  / ((double) (nCycles - N-1));
+    energy2 = energy2Sum / ((double) (nCycles - N-1));
 
-    cout << "<E>  = " << energy << endl;
-    cout << "<E²> = " << energy2 << endl;
-    cout << "Variance  = " << (energy2 - energy*energy)/sqrt(nCycles) << endl;
+    cout << "<E>  = " << setprecision(15) << energy << endl;
+    cout << "<E²> = " << setprecision(15) << energy2 << endl;
+    cout << "Variance  = " << (energy2 - energy*energy)/((double) nCycles) << endl;
     cout << "Std. dev. = " << sqrt((energy2 - energy*energy)/sqrt(nCycles)) << endl;
-    cout << "Accepted steps / total steps = " << ((double) accepted) / nCycles << endl;
+    cout << "Accepted steps / total steps = " << ((double) accepted) / (nCycles - N-1) << endl;
     cout << "Total steps, nCycles = " << nCycles << endl;
 
     return energy;
@@ -358,11 +366,11 @@ double VariationalMC::computeEnergy(mat &R, mat &r, double psi) {
     return E_L2;
 }
 
+//We need to add energycrossterm and the correlation part
 double VariationalMC::computeKineticEnergyClosedForm(const mat& R, const mat& r, const mat& slater, int k) {
     double returnVal = 0.0;
     for (int i = 0; i < nParticles/2; i++) {
         for (int j = 0; j < nParticles/2; j++) {
-            //cout << "i,j,k=" <<i << " " << j << " " << " " << k << " " <<psiDoubleDerivative(R(i+2*k,i+2*k), j) << endl;
             returnVal += psiDoubleDerivative(R(i+2*k,i+2*k), j) * slater(j,i);
         }
     }
@@ -372,12 +380,17 @@ double VariationalMC::computeKineticEnergyClosedForm(const mat& R, const mat& r,
 
 double VariationalMC::computePotentialEnergyClosedForm(const mat& R) {
     double returnVal = 0.0;
-
+    double E1 = 0.0;
     // Compute the commutative part of H.
     for(int i = 0; i < nParticles; i++) {
         returnVal -= Z/R(i,i);
+
+        for(int j = i+1; j<nParticles; j++) {
+            E1 += 1/R(i,j);
+        }
     }
-    return returnVal;
+
+    return returnVal + E1;
 }
 
 
@@ -500,8 +513,7 @@ void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
     for(int k=0; k<i; k++) {
         sum = 0;
         for(int l =0;l<nDimensions;l++){
-            dxx = r(i,l) - r(k,l); // [l+i*nDimensions]-r[l+k*nDimensions];   //this may need to be changed to r[i,l] - r[k,l]
-                                                         // (likewise for the next loops)
+            dxx = r(i,l) - r(k,l);
             sum += dxx*dxx;
         }
         R(k,i) = sqrt(sum); //R is the matrix of distances
@@ -556,18 +568,18 @@ void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
 void VariationalMC::computeQuantumForce(mat & QuantumForce, mat &R, mat &r, mat & jastrowGradient, mat & slaterGradient, double & energycrossterm) {
     energycrossterm = 0.0;
     for (int k = 0; k<nParticles; k++) {
-        for (int j =0 ; j<nDimensions; j++) {//we use the function jastrowgradient far too many times here, this should bedone more effectively
+        for (int j =0 ; j<nDimensions; j++) {//we call the function jastrowgradient far too many times here, this should be done more effectively!!!!!
             double sum = 0;
-            for (int i = 0; i<k-1; i++) {
+            for (int i = 0; i<k; i++) {
                 sum += (r(k,j)-r(i,j))/R(i,k)*jastrowGradient(i,k);
 
             }
             for (int i = k+1; i < nParticles; i++) {
                 sum -= (r(i,j)-r(k,j))/R(k,i)*jastrowGradient(k,i);
             }
-            //QuantumForce(k,j) = 2*(slaterGradient(k,j) + sum);
-            QuantumForce(k,j) = 2*slaterGradient(k,j);
-            energycrossterm += 2*(slaterGradient(k,j) * sum);
+            QuantumForce(k,j) = 2*(slaterGradient(k,j) + sum);
+            //QuantumForce(k,j) = 2*slaterGradient(k,j);
+            energycrossterm -= (slaterGradient(k,j) * sum);
         }
     }
 }
@@ -613,7 +625,12 @@ double VariationalMC::psi_s2_doubleDerivative(double distance) {
 
 
 
-void VariationalMC::computeSlaterGradient(mat &Rnew, mat &r, mat& slater,mat& gradient, double R, int particle) {
+void VariationalMC::computeSlaterGradient(mat &Rnew,
+                                          mat &r,
+                                          mat& slater,
+                                          mat& gradient,
+                                          double R,
+                                          int particle) {
 
     int k = particle %2; //the remainder
     for (int o = 0; o < nDimensions; o++) {
@@ -621,10 +638,16 @@ void VariationalMC::computeSlaterGradient(mat &Rnew, mat &r, mat& slater,mat& gr
         for (int j = 0; j < (nParticles / 2); j++) {
             sum += psiDerivative(Rnew(particle,particle),r(particle,o), j)*slater(j,k);
         }
-        gradient(particle,o) = 1.0/R *sum;
-        //cout << gradient(particle,o) << endl;
+        gradient(particle,o) = 1.0/R * sum;
+//        if (abs(gradient(particle,o))> 20 ) {
+//        cout << gradient(particle,o) << endl;
+//        cout << slater << endl;
+//        cout << Rnew << endl;
+//        cout << r << endl;
+//        }
     }
 }
+
 
 double VariationalMC::psiDerivative(double distance, double coord, int j) {
     if (j == 0) {
@@ -658,7 +681,7 @@ double VariationalMC::computeSlaterRatio(const mat& slaterInverseOld, double dis
 }
 
 void VariationalMC::computeJastrowGradient(const mat& R, mat& jastrowGradient, int particle) {
-    for (int i = 0; i<particle-1; i++) {
+    for (int i = 0; i<particle; i++) {
         double factor = 1+beta*R(i,particle);
         jastrowGradient(i,particle) = spins(i,particle)/(factor*factor);
     }
@@ -679,20 +702,21 @@ void VariationalMC::computeJastrowLaplacian(const mat& R, mat& jastrowLaplacian,
     }
 }
 
-void VariationalMC::computeJastrowEnergy(const mat& R, mat& jastrowLaplacian, mat& jastrowGradient) {
+double VariationalMC::computeJastrowEnergy(const mat& R, mat& jastrowLaplacian, mat& jastrowGradient) {
     double sum = 0.0;
     for (int k = 0; k<nParticles; k++) {
-//        for (int j = 0; j<nDimensions; j++) {
-//            double factor = jastrowGradient(k,j);
-//            sum += factor*factor;
-//        }
-        for (int i = 0; i<k-1; i++) {
+        for (int j = 0; j<nDimensions; j++) {
+            double factor = jastrowGradient(k,j);
+            sum += factor*factor;
+        }
+        for (int i = 0; i<k; i++) {
             sum += (nDimensions -1)/R(i,k)*jastrowGradient(i,k) +jastrowLaplacian(i,k);
         }
         for (int i = k+1; i < nParticles; i++) {
             sum += (nDimensions -1)/R(k,i)*jastrowGradient(k,i) +jastrowLaplacian(k,i);
         }
     }
+    return sum/(-2.0);
 }
 
 /* Choses which wave function to calculate from the int j, then calls the corresponding psi_j. */
@@ -742,11 +766,7 @@ void VariationalMC::updateSlaterInverse(mat&        slaterNew,
                 slaterNew(k,j) = slaterOld(k,j) - slaterOld(k,i) * sum / R;
             }
             else {
-                double sum = 0;
-                for( int l = 0; l< nParticles/2; l++) {
-                    sum += slaterPsi(Rold(i+2*p,i+2*p), l) * slaterOld(l, j);
-                }
-                slaterNew(k,j) = slaterOld(k,i)*sum / R;
+                slaterNew(k,j) = slaterOld(k,i)/ R;
             }
         }
     }
@@ -816,7 +836,7 @@ double VariationalMC::computeRc( const mat& correlationsOld,
   for (int i = 0; i < k; i++) {
     Rc += correlationsNew(i,k) - correlationsOld(i,k);
   }
-  for (int i = k + 1;i<nParticles; i++) {
+  for (int i = k+1;i<nParticles; i++) {
     Rc += correlationsNew(k,i) - correlationsOld(k,i);
   }
   return exp(Rc);
@@ -832,7 +852,7 @@ void VariationalMC::updateCorrelationsMatrix( mat& correlationsMat,
 
   int k = particle;
 
-  for (int i = 0; i < (k-1); i++) {
+  for (int i = 0; i < (k); i++) {
     correlationsMat(i,k) = spins(i,k) * R(i,k) / (1 + beta * R(i,k));
   }
   for (int i = (k+1); i < nParticles; i++) {
