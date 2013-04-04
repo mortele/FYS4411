@@ -15,7 +15,7 @@ using namespace arma;
 VariationalMC::VariationalMC() :
     nParticles  (4),
     nDimensions (3),
-    nCycles     (1),
+    nCycles     (500000),
     N       (2 * nCycles / 10),
     idum    (time(0)),
     h       (0.00001),
@@ -24,7 +24,7 @@ VariationalMC::VariationalMC() :
     alph2   (alph * alph),
     beta    (1.0),
     Z       (nParticles),
-    stepSize(0.001),
+    stepSize(0.0001),
     D       (0.5),
     dt      (0.03), // 0.0007
     dx      (zeros(nDimensions)),
@@ -92,7 +92,7 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
     // Fill coordinates matrix with random values.
     for (int i = 0; i < nParticles; i++) {
         for (int j = 0; j < nDimensions; j++) {
-            coordinatesNew(i,j) = (ran0(&idum)-0.5) * 20.0/ (alph);
+            coordinatesNew(i,j) = (ran0(&idum)-0.5) * 10.0/ (alph);
             coordinatesOld(i,j) = coordinatesNew(i,j);
         }
     }
@@ -191,20 +191,27 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
         if (iRand >= (nParticles/2)) {
             // Down part.
             R = computeSlaterRatio(slaterOldDown, Rnew(iRand,iRand), iRand-(nParticles/2)); // *Rc
-            computeSlaterGradient(Rnew, coordinatesNew,slaterOldDown, slaterGradient,R, iRand);
+            //computeSlaterGradient(Rnew, coordinatesNew,slaterOldDown, slaterGradient,R, iRand);
         } else {
             // Up part.
             R = computeSlaterRatio(slaterOldUp, Rnew(iRand,iRand), iRand);  // *Rc
-            computeSlaterGradient(Rnew, coordinatesNew,slaterOldUp, slaterGradient,R, iRand);
+            //computeSlaterGradient(Rnew, coordinatesNew,slaterOldUp, slaterGradient,R, iRand);
         }
-
+        for (int i=0; i<nParticles; i++) {
+            if (i>=nParticles/2) {
+                computeSlaterGradient(Rnew, coordinatesNew,slaterOldDown, slaterGradient,R, i);
+            }
+            else {
+                computeSlaterGradient(Rnew, coordinatesNew,  slaterOldUp, slaterGradient,R, i);
+            }
+        }
 //        correlationNew = computeCorrelation(Rnew);
 //        R = Rsd * correlationNew / correlationOld;
 
         computeJastrowGradient(Rnew, jastrowGradient, iRand);
         computeJastrowLaplacian(Rnew, jastrowLaplacian, iRand);
         computeQuantumForce(quantumForceNew, Rnew, coordinatesNew, jastrowGradient, slaterGradient, energycrossterm);
-        cout << slaterGradientOld << endl;
+        //cout << slaterGradientOld << endl;
 
         // Compute the inside of the exponential term of the difference between Greens functions.
         greensFunction = 0.0;
@@ -227,7 +234,7 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
         // ecoeff =greensFunction * newWaveFunction * newWaveFunction / (oldWaveFunction * oldWaveFunction);
 
         ecoeff =  R * R * greensFunction;
-        //cout << greensFunction << endl;
+        //cout << R << endl;
         if (ecoeff > ran0(&idum)) {
             // Accept new step, calculate new energy.
             accepted++;
@@ -237,28 +244,26 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
             slaterGradientOld = slaterGradient;
             jastrowGradientOld = jastrowGradient;
             jastrowLaplacianOld = jastrowLaplacian;
-            Rold = Rnew; // Denne burde ikke være her, men hvis ikke blir resultatet dårlig
-            //energy          = computeEnergyNumerical(Rnew, coordinatesNew, newWaveFunction);
 
 
             // Check which slater determinand we need to change -- up or down.
             if (iRand >= (nParticles/2)) {
                 // Down part.
-                updateSlaterInverse(slaterNewDown, slaterOldDown, Rnew, Rold, iRand -nParticles/2, 1, R*R);
-//                evaluateSlater(slaterNewDown,Rnew,1);
-//                cout << slaterNewDown << endl;
-//                slaterNewDown = slaterNewDown.i();
-//                cout << "inv=" <<slaterNewDown << endl;
-//                cout << "R=" << Rnew << endl;
+                updateSlaterInverse(slaterNewDown, slaterOldDown, Rnew, Rold, iRand -nParticles/2, 1, R);
                 slaterOldDown = slaterNewDown;
-
             } else {
                 // Up part.
-                updateSlaterInverse(slaterNewUp, slaterOldUp, Rnew, Rold, iRand, 0, R*R);
-//                evaluateSlater(slaterNewUp, Rnew,0);
-//                slaterNewUp = slaterNewUp.i();
+                updateSlaterInverse(slaterNewUp, slaterOldUp, Rnew, Rold, iRand, 0, R);
                 slaterOldUp = slaterNewUp;
+//                mat slatertest = zeros<mat>(nParticles/2, nParticles/2);
+//                evaluateSlater(slatertest, Rnew,0);
+//                cout << " identity : "<<det(slaterNewUp*slatertest) << endl;
+//                if (abs(det(slaterNewUp*slatertest)-1)>1e-12) {
+//                    cout << det(slaterNewUp*slatertest) << endl;
+//                    exit(1);
+//                }
             }
+            Rold = Rnew;
 
 
             // Compute the energy.
@@ -266,7 +271,6 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
             energyDown = computeKineticEnergyClosedForm(Rnew,coordinatesNew,slaterNewDown, 1);
             energyPot  = computePotentialEnergyClosedForm(Rnew);
             energy = energyUp + energyDown + energyPot;
-            //cout << ecoeff << endl;
             //energy = computeEnergyNumerical(Rnew, coordinatesNew, computePsi(Rnew));
 
 
@@ -279,14 +283,16 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
             quantumForceNew = quantumForceOld;
             Rnew = Rold;
             // Check which slater determinand we need to change -- up or down.
-            if (iRand >= (nParticles/2)) {
-                // Down part.
-               slaterNewDown = slaterOldDown;
-            } else {
-                // Up part.
-                slaterNewUp = slaterOldUp;
-            }
+//            if (iRand >= (nParticles/2)) {
+//                // Down part.
+//               slaterNewDown = slaterOldDown;
+//            } else {
+//                // Up part.
+//                slaterNewUp = slaterOldUp;
+//            }
+
         }
+
 
 
         // Add energy of this state to the energy sum.
@@ -723,24 +729,24 @@ void VariationalMC::updateSlaterInverse(mat&        slaterNew,
                                         const mat&  slaterOld,
                                         const mat&  Rnew,
                                         const mat&  Rold,
-                                        int         particle,
-                                        int         k,
+                                        int         i,
+                                        int         p,
                                         double      R) {
-    for (int i = 0;i<nParticles/2; i++) {
+    for (int k = 0;k<nParticles/2; k++) {
         for (int j = 0; j<nParticles/2; j++) {
-            if(j != particle) {
+            if(j != i) {
                 double sum = 0;
                 for( int l = 0; l< nParticles/2; l++) {
-                    sum += slaterOld(l,j) * slaterPsi(Rnew(particle+2*k,particle+2*k), l);
+                    sum += slaterOld(l,j) * slaterPsi(Rnew(i+2*p,i+2*p), l);
                 }
-                slaterNew(i,j) = slaterOld(i,j) - slaterOld(i,particle) * sum / R;
+                slaterNew(k,j) = slaterOld(k,j) - slaterOld(k,i) * sum / R;
             }
             else {
                 double sum = 0;
                 for( int l = 0; l< nParticles/2; l++) {
-                    sum += slaterPsi(Rold(particle+2*k,particle+2*k), l) * slaterOld(l, j);
+                    sum += slaterPsi(Rold(i+2*p,i+2*p), l) * slaterOld(l, j);
                 }
-                slaterNew(i,j) = slaterOld(i,particle)*sum / R;
+                slaterNew(k,j) = slaterOld(k,i)*sum / R;
             }
         }
     }
