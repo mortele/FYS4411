@@ -13,9 +13,9 @@ using namespace arma;
 
 /* VMC constructor. */
 VariationalMC::VariationalMC() :
-    nParticles  (4),
+    nParticles  (2),
     nDimensions (3),
-    nCycles     (1000000),
+    nCycles     (500000),
     N       (2 * nCycles / 10),
     idum    (time(0)),
     h       (0.00001),
@@ -93,7 +93,7 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
     // Fill coordinates matrix with random values.
     for (int i = 0; i < nParticles; i++) {
         for (int j = 0; j < nDimensions; j++) {
-            coordinatesNew(i,j) = gaussian_deviate(&idum) * 3.0/ (alph);
+            coordinatesNew(i,j) = gaussian_deviate(&idum) * 2.0/ (alph);
             coordinatesOld(i,j) = coordinatesNew(i,j);
         }
     }
@@ -245,7 +245,7 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
             accepted++;
             coordinatesOld.row(iRand) = coordinatesNew.row(iRand);
             quantumForceOld = quantumForceNew;           
-            correlationOld  = correlationNew;
+            correlationsOld  = correlationsNew;
             slaterGradientOld = slaterGradient;
             jastrowGradientOld = jastrowGradient;
             jastrowLaplacianOld = jastrowLaplacian;
@@ -276,13 +276,13 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
             energyPot  = computePotentialEnergyClosedForm(Rnew);
             energyJas  = computeJastrowEnergy(Rnew, jastrowLaplacian, jastrowGradient);
             energy = energyUp + energyDown + energyPot + energyJas + energycrossterm;
-
+            //energy = computeEnergy(Rnew, coordinatesNew, R);
         } else {
 
 
             // Reject suggested step, energy remains as before.
             coordinatesNew.row(iRand) = coordinatesOld.row(iRand);
-
+            correlationsNew = correlationsOld;
             slaterGradient = slaterGradientOld;
             jastrowGradient = jastrowGradientOld;
             jastrowLaplacian = jastrowLaplacianOld;
@@ -313,8 +313,6 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
             energy2Sum = 0.0;
             accepted   = 0;
         }
-
-
     }
 
     // Calculate the expected value of the energy, the energy squared, and the variance.
@@ -360,7 +358,6 @@ double VariationalMC::computeEnergy(mat &R, mat &r, double psi) {
     double b2 = 1 + b1;
     double b3 = 1/(2 * b2 * b2);
     double prikk = r(0,0) * r(1,0) +  r(0,1) * r(1,1) + r(0,2) * r(1,2);
-
     double E_L1 = (alph - Z) * (1 / R(0,0)  + 1 / R(1,1)) + 1 / R(0,1) - alph2; // (alph - Z) +  + 1 / R(0,1)
     double E_L2 = E_L1 + b3 * ( (alph * (R(0,0) + R(1,1))) / (R(0,1))  * (1 - (prikk / (R(0,0) * R(1,1)))) - b3 - 2 / R(0,1) + ((2*beta) / b2));
     return E_L2;
@@ -369,12 +366,12 @@ double VariationalMC::computeEnergy(mat &R, mat &r, double psi) {
 //We need to add energycrossterm and the correlation part
 double VariationalMC::computeKineticEnergyClosedForm(const mat& R, const mat& r, const mat& slater, int k) {
     double returnVal = 0.0;
+    int o = nParticles/2*k;
     for (int i = 0; i < nParticles/2; i++) {
         for (int j = 0; j < nParticles/2; j++) {
-            returnVal += psiDoubleDerivative(R(i+2*k,i+2*k), j) * slater(j,i);
+            returnVal += psiDoubleDerivative(R(i+o,i+o), j) * slater(j,i);
         }
     }
-    //cout << "slaterkin = " << returnVal /(-2.0) << endl;
     return returnVal / (-2.0);
 }
 
@@ -572,14 +569,13 @@ void VariationalMC::computeQuantumForce(mat & QuantumForce, mat &R, mat &r, mat 
             double sum = 0;
             for (int i = 0; i<k; i++) {
                 sum += (r(k,j)-r(i,j))/R(i,k)*jastrowGradient(i,k);
-
             }
             for (int i = k+1; i < nParticles; i++) {
                 sum -= (r(i,j)-r(k,j))/R(k,i)*jastrowGradient(k,i);
             }
             QuantumForce(k,j) = 2*(slaterGradient(k,j) + sum);
             //QuantumForce(k,j) = 2*slaterGradient(k,j);
-            energycrossterm -= (slaterGradient(k,j) * sum);
+            energycrossterm  -= (slaterGradient(k,j) * sum) + sum*sum/2;
         }
     }
 }
@@ -692,7 +688,7 @@ void VariationalMC::computeJastrowGradient(const mat& R, mat& jastrowGradient, i
 }
 
 void VariationalMC::computeJastrowLaplacian(const mat& R, mat& jastrowLaplacian, int particle) {
-    for (int i = 0; i<particle-1; i++) {
+    for (int i = 0; i<particle; i++) {
         double factor = 1+beta*R(i,particle);
         jastrowLaplacian(i,particle) = -2*spins(i,particle)*beta/(factor*factor*factor);
     }
@@ -705,10 +701,6 @@ void VariationalMC::computeJastrowLaplacian(const mat& R, mat& jastrowLaplacian,
 double VariationalMC::computeJastrowEnergy(const mat& R, mat& jastrowLaplacian, mat& jastrowGradient) {
     double sum = 0.0;
     for (int k = 0; k<nParticles; k++) {
-        for (int j = 0; j<nDimensions; j++) {
-            double factor = jastrowGradient(k,j);
-            sum += factor*factor;
-        }
         for (int i = 0; i<k; i++) {
             sum += (nDimensions -1)/R(i,k)*jastrowGradient(i,k) +jastrowLaplacian(i,k);
         }
@@ -756,12 +748,13 @@ void VariationalMC::updateSlaterInverse(mat&        slaterNew,
                                         int         i,
                                         int         p,
                                         double      R) {
+    int o = i+nParticles/2*p;
     for (int k = 0;k<nParticles/2; k++) {
         for (int j = 0; j<nParticles/2; j++) {
             if(j != i) {
                 double sum = 0;
                 for( int l = 0; l< nParticles/2; l++) {
-                    sum += slaterOld(l,j) * slaterPsi(Rnew(i+2*p,i+2*p), l);
+                    sum += slaterOld(l,j) * slaterPsi(Rnew(o,o), l);
                 }
                 slaterNew(k,j) = slaterOld(k,j) - slaterOld(k,i) * sum / R;
             }
@@ -783,8 +776,6 @@ void VariationalMC::evaluateSlater(mat& slater, mat& R, int k) {
         }
     }
 }
-
-
 
 
 /* Fills the matrix of spin values, which is used to compute the correlation
@@ -822,7 +813,6 @@ void VariationalMC::fillCorrelationsMatrix( mat& correlationsMat,
     }
   }
 }
-
 
 
 /* Computes the ratio of the new correlations to the old, Rc. */
