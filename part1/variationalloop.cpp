@@ -8,9 +8,9 @@ VariationalLoop::VariationalLoop() {
 }
 
 void VariationalLoop::initialize_helium() {
-    this->N     = 10;
-    this->start = 0.9;
-    this->end   = 2.1;
+    this->N     = 40;
+    this->start = 2.0;
+    this->end   = 4.0;
     this->E     = 0.0;
     this->minE  = 1e300;
     this->minA  = 0.0;
@@ -23,14 +23,15 @@ void VariationalLoop::run() {
     ofstream outFile("data_varying_a_and_b__N_100_points_from_0_9_to_2_0.dat");
     double startClock, finishClock, acceptanceRatio;
 
-    b = 1.0;
+
     for (int k = 0; k < N; k++) {
         for (int j = 0; j < N; j++) {
             startClock = clock();
             b = start + ((end-start)/N) * k;
             a = start + ((end-start)/N) * j;
-            a = 4.0;
-            b = 0.3;
+            b = 0.5;
+            a = 1.8;
+
             cout << "/-------------------------------------------------------------\\" << endl;
             printf("|   For parameters:    a = %8.4f,   and    b = %8.4f    |\n", a, b);
             cout << "\\-------------------------------------------------------------/" << endl;
