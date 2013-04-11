@@ -15,7 +15,7 @@ using namespace arma;
 VariationalMC::VariationalMC() :
     nParticles  (4),
     nDimensions (3),
-    nCycles     (50000),
+    nCycles     (500000),
     N       (2 * nCycles / 10),
     idum    (time(0)),
     h       (0.00001),
@@ -24,7 +24,7 @@ VariationalMC::VariationalMC() :
     alph2   (alph * alph),
     beta    (1.0),
     Z       (nParticles),
-    stepSize(0.000000001),
+    stepSize(0.0001),
     D       (0.5),
     dt      (0.03), // 0.0007
     dx      (zeros(nDimensions)),
@@ -190,14 +190,14 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
             quantumForceOld = quantumForceNew;
             oldWaveFunction = newWaveFunction;
             correlationOld  = correlationNew;
-            Rold = Rnew;
+            Rold = Rnew; // Denne burde ikke være her, men hvis ikke blir resultatet dårlig
             //energy          = computeEnergyNumerical(Rnew, coordinatesNew, newWaveFunction);
-            //cout << slaterNewUp << endl;
+
 
             // Check which slater determinand we need to change -- up or down.
-            if (iRand > (nParticles/2)) {
+            if (iRand >= (nParticles/2)) {
                 // Down part.
-                updateSlaterInverse(slaterNewDown, slaterOldDown, Rnew, Rold, iRand -nParticles/2, 1, R);
+                updateSlaterInverse(slaterNewDown, slaterOldDown, Rnew, Rold, iRand -nParticles/2, 1, ecoeff);
 //                evaluateSlater(slaterNewDown,Rnew,1);
 //                cout << slaterNewDown << endl;
 //                slaterNewDown = slaterNewDown.i();
@@ -207,11 +207,12 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
 
             } else {
                 // Up part.
-                updateSlaterInverse(slaterNewUp, slaterOldUp, Rnew, Rold, iRand, 0, R);
+                updateSlaterInverse(slaterNewUp, slaterOldUp, Rnew, Rold, iRand, 0, ecoeff);
 //                evaluateSlater(slaterNewUp, Rnew,0);
 //                slaterNewUp = slaterNewUp.i();
                 slaterOldUp = slaterNewUp;
             }
+
 
             // Compute the energy.
             energyUp   = computeKineticEnergyClosedForm(Rnew,coordinatesNew,slaterNewUp, 0);
@@ -225,14 +226,15 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
         } else {
             // Reject suggested step, energy remains as before.
             coordinatesNew.row(iRand) = coordinatesOld.row(iRand);
+
             // Check which slater determinand we need to change -- up or down.
-            if (iRand > (nParticles/2)) {
-                // Down part.
-               slaterNewDown = slaterOldDown;
-            } else {
-                // Up part.
-                slaterNewUp = slaterOldUp;
-            }
+//            if (iRand >= (nParticles/2)) {
+//                // Down part.
+//               slaterNewDown = slaterOldDown;
+//            } else {
+//                // Up part.
+//                slaterNewUp = slaterOldUp;
+//            }
         }
 
 
@@ -507,12 +509,12 @@ double VariationalMC::psi_s2(double distance){
     return (1-alph*distance/2.)*exp(-alph*distance/2);
 }
 
-double VariationalMC::psi_s1_derivative(double distance) {
-
+double VariationalMC::psi_s1_derivative(double distance, double coord) { //distance is r, coord is x,y or z
+    return -alph*coord*exp(-alph*distance)/distance;
 }
 
-double VariationalMC::psi_s2_derivative(double distance) {
-
+double VariationalMC::psi_s2_derivative(double distance, double coord) { //distance is r, coord is x,y or z
+    return 1/4.*alph*(alph*distance - 4)*coord *exp(-alph*distance/2)/distance;
 }
 
 double VariationalMC::psi_s1_doubleDerivative(double distance) {
@@ -523,8 +525,31 @@ double VariationalMC::psi_s2_doubleDerivative(double distance) {
     return (5.0/4.0 * alph2 - 2 * alph / distance - alph2*alph * distance / 8.) * exp(-alph * distance / 2.);
 }
 
-double VariationalMC::psiDerivative(double distance, int j) {
+void VariationalMC::computeSlaterGradient(mat &R, mat &r, mat& slater,mat gradient, double R2, int particle) {
 
+    //vec gradient(nDimensions*nParticles);
+
+    int k = particle %2; //the rest
+    for (int o = 0; o < nDimensions; o++) {
+        double sum = 0;
+        for (int j = 0; j < (nParticles / 2); j++) {
+            sum += psiDerivative(R(particle,particle),r(particle,o), j)*slater(j,particle);
+        }
+        gradient(nDimensions*particle+o) = 1/R2 *sum;
+    }
+
+    //return gradient;
+}
+
+double VariationalMC::psiDerivative(double distance, double coord, int j) {
+    if (j == 0) {
+        return psi_s1_derivative(distance,coord);
+    } else if (j == 1) {
+        return psi_s2_derivative(distance,coord);
+    } else {
+        return 0;
+        cout << "Error in psiDerivative" << j  << endl;
+    }
 }
 
 double VariationalMC::psiDoubleDerivative(double distance, int j) {
@@ -584,7 +609,7 @@ void VariationalMC::updateSlaterInverse(mat&        slaterNew,
                                         const mat&  Rold,
                                         int         particle,
                                         int         k,
-                                        double      Rsd) {
+                                        double      R) {
     for (int i = 0;i<nParticles/2; i++) {
         for (int j = 0; j<nParticles/2; j++) {
             if(j != particle) {
@@ -592,14 +617,14 @@ void VariationalMC::updateSlaterInverse(mat&        slaterNew,
                 for( int l = 0; l< nParticles/2; l++) {
                     sum += slaterOld(l,j) * slaterPsi(Rnew(particle+2*k,particle+2*k), l);     //slaternew(particle,l) * slaterold(l,j);
                 }
-                slaterNew(i,j) = slaterOld(i,j) - slaterOld(i,particle) * sum / Rsd;
+                slaterNew(i,j) = slaterOld(i,j) - slaterOld(i,particle) * sum / R;
             }
             else {
                 double sum = 0;
                 for( int l = 0; l< nParticles/2; l++) {
                     sum += slaterPsi(Rold(particle+2*k,particle+2*k), l) * slaterOld(l, j);
                 }
-                slaterNew(i,j) = slaterOld(i,particle)*sum / Rsd;
+                slaterNew(i,j) = slaterOld(i,particle)*sum / R;
             }
         }
     }
