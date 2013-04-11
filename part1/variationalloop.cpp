@@ -18,52 +18,81 @@ void VariationalLoop::initialize_helium() {
 }
 
 void VariationalLoop::run() {
+    double startClock, finishClock, energy;
+    vec    energyVarGrad = zeros<vec>(3);
+    vec    varGrad       = zeros<vec>(2);
+    vec    alphaBeta     = zeros<vec>(2);
+    alphaBeta(0) = 2;
+    alphaBeta(1) = 2;
 
+    for (int i = 1; i < 100; i++) {
+        startClock = clock();
 
-    ofstream outFile("data_varying_a_and_b__N_100_points_from_0_9_to_2_0.dat");
-    double startClock, finishClock, acceptanceRatio;
+        // Run one metropolis loop.
+        energyVarGrad = m.runMetropolis(alphaBeta(0), alphaBeta(1));
+        energy        = energyVarGrad(0);
+        varGrad(0)    = energyVarGrad(1);
+        varGrad(1)    = energyVarGrad(2);
 
+        // Compute new values of alpha / beta.
+        alphaBeta -= (1/i) * varGrad * energy;
 
-    for (int k = 0; k < N; k++) {
-        for (int j = 0; j < N; j++) {
-            startClock = clock();
-            b = start + ((end-start)/N) * k;
-            a = start + ((end-start)/N) * j;
-            b = 0.5;
-            a = 1.8;
-
-            cout << "/-------------------------------------------------------------\\" << endl;
-            printf("|   For parameters:    a = %8.4f,   and    b = %8.4f    |\n", a, b);
-            cout << "\\-------------------------------------------------------------/" << endl;
-
-            E = m.runMetropolis(a,b);
-            //acceptanceRatio = m.acceptanceRatio;
-
-            //outFile << setprecision(15) << a << " " << b << " " << E << " " << acceptanceRatio <<endl;
-
-            if (E < minE) {
-                minE = E;
-                minA = a;
-                minB = b;
-                //            cout << "minA=" << minA << endl;
-                //            cout << "minB=" << minB << endl;
-                //            cout << "minE=" << minE << endl;
-            }
-            finishClock = clock();
-            cout << "   * Time usage       = " << (finishClock - startClock) / 1000000.0 << " [s] "<< endl;
-            cout << endl << endl;
+        if (alphaBeta(0) < 0) {
+            alphaBeta(0) = 0.01;
+        } else if (alphaBeta(1) < 0) {
+            alphaBeta(1) = 0.01;
         }
+
+        finishClock = clock();
+        cout << "   * Time usage       = " << (finishClock - startClock) / 1000000.0 << " [s] "<< endl;
+        cout << "   * Alpha            = " << alphaBeta(0) << endl;
+        cout << "   * Beta             = " << alphaBeta(1) << endl;
+        cout << endl << endl;
     }
 
-    double Eexperimental = -2.9037;
-    cout << "/-------------------------------------------------------------\\" << endl;
-    printf("|                     Best parameters found                    |\n");
-    cout << "\\-------------------------------------------------------------/" << endl;
-    cout << "   * a                     = " << minA << endl;
-    cout << "   * b                     = " << minB << endl;
-    cout << "   * With corresponding E  = " << minE << endl;
-    cout << "   * Experimental value E' = " << Eexperimental << endl;
-    cout << "   * |E - E'|              = " << abs(minE - Eexperimental) << endl << endl << endl;
 
-    outFile.close();
+
+//  ofstream outFile("data_varying_a_and_b__N_100_points_from_0_9_to_2_0.dat");
+//    for (int k = 0; k < N; k++) {
+//        for (int j = 0; j < N; j++) {
+//            startClock = clock();
+//            b = start + ((end-start)/N) * k;
+//            a = start + ((end-start)/N) * j;
+//            b = 0.5;
+//            a = 1.8;
+
+//            cout << "/-------------------------------------------------------------\\" << endl;
+//            printf("|   For parameters:    a = %8.4f,   and    b = %8.4f    |\n", a, b);
+//            cout << "\\-------------------------------------------------------------/" << endl;
+
+//            E = m.runMetropolis(a,b);
+//            //acceptanceRatio = m.acceptanceRatio;
+
+//            //outFile << setprecision(15) << a << " " << b << " " << E << " " << acceptanceRatio <<endl;
+
+////            if (E < minE) {
+////                minE = E;
+////                minA = a;
+////                minB = b;
+//                //            cout << "minA=" << minA << endl;
+//                //            cout << "minB=" << minB << endl;
+//                //            cout << "minE=" << minE << endl;
+////            }
+//            finishClock = clock();
+//            cout << "   * Time usage       = " << (finishClock - startClock) / 1000000.0 << " [s] "<< endl;
+//            cout << endl << endl;
+//        }
+//    }
+
+//    double Eexperimental = -2.9037;
+//    cout << "/-------------------------------------------------------------\\" << endl;
+//    printf("|                     Best parameters found                    |\n");
+//    cout << "\\-------------------------------------------------------------/" << endl;
+//    cout << "   * a                     = " << minA << endl;
+//    cout << "   * b                     = " << minB << endl;
+//    cout << "   * With corresponding E  = " << minE << endl;
+//    cout << "   * Experimental value E' = " << Eexperimental << endl;
+//    cout << "   * |E - E'|              = " << abs(minE - Eexperimental) << endl << endl << endl;
+
+//    outFile.close();
 }

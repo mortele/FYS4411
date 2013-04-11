@@ -33,7 +33,7 @@ VariationalMC::VariationalMC() :
 
 
 /* Runs the Metropolis algorithm nCycles times. */
-double VariationalMC::runMetropolis(double alpha, double beta) {
+vec VariationalMC::runMetropolis(double alpha, double beta) {
     this->alph  = alpha;
     this->alph2 = alph * alph;
     this->beta  = beta;
@@ -49,14 +49,18 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
     mat slaterNewUp     = zeros<mat>(nParticles/2, nParticles/2);
     mat slaterNewDown   = zeros<mat>(nParticles/2, nParticles/2);
     mat slaterGradient  = zeros<mat>(nParticles, nDimensions);
-    mat slaterGradientOld = zeros<mat>(nParticles, nDimensions);
-    mat jastrowGradient = zeros<mat>(nParticles, nParticles);
-    mat jastrowGradientOld = zeros<mat>(nParticles, nParticles);
-    mat jastrowLaplacian = zeros<mat>(nParticles, nParticles);
+    mat slaterGradientOld   = zeros<mat>(nParticles, nDimensions);
+    mat jastrowGradient     = zeros<mat>(nParticles, nParticles);
+    mat jastrowGradientOld  = zeros<mat>(nParticles, nParticles);
+    mat jastrowLaplacian    = zeros<mat>(nParticles, nParticles);
     mat jastrowLaplacianOld = zeros<mat>(nParticles, nParticles);
-    mat quantumForceOld = zeros<mat>(nParticles, nDimensions);
-    mat quantumForceNew = zeros<mat>(nParticles, nDimensions);
+    mat quantumForceOld     = zeros<mat>(nParticles, nDimensions);
+    mat quantumForceNew     = zeros<mat>(nParticles, nDimensions);
 
+    vec variationalGrad     = zeros<vec>(2);
+    vec variationalGradE    = zeros<vec>(2);
+    vec variationalGradSum  = zeros<vec>(2);
+    vec variationalGradESum = zeros<vec>(2);
 
     double ecoeff          = 0.0;
     double Rsd             = 0.0;
@@ -125,6 +129,17 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
     energyPot = computePotentialEnergyClosedForm(Rnew);
     energy = energyUp + energyDown + energyPot;
     //cout << energy << endl;
+
+    updateVariationalGradient(variationalGrad,
+                              variationalGradE,
+                              Rnew,
+                              slaterNewUp,
+                              slaterNewDown,
+                              correlationsNew,
+                              energy,
+                              variationalGradSum,
+                              variationalGradESum);
+
 
     // Compute the correlation factor in the initial state.
     correlationOld  = computeCorrelation(Rnew);
@@ -275,8 +290,10 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
             energyDown = computeKineticEnergyClosedForm(Rnew,coordinatesNew,slaterNewDown, 1);
             energyPot  = computePotentialEnergyClosedForm(Rnew);
             energyJas  = computeJastrowEnergy(Rnew, jastrowLaplacian, jastrowGradient);
-            energy = energyUp + energyDown + energyPot + energyJas + energycrossterm;
-            //energy = computeEnergy(Rnew, coordinatesNew, R);
+            //energy = energyUp + energyDown + energyPot + energyJas + energycrossterm;
+            energy = computeEnergy(Rnew, coordinatesNew, R);
+
+            updateVariationalGradient(variationalGrad,variationalGradE,Rnew,slaterNewUp,slaterNewDown,correlationsNew, energy,variationalGradSum,variationalGradESum);
         } else {
 
 
@@ -287,6 +304,9 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
             jastrowGradient = jastrowGradientOld;
             jastrowLaplacian = jastrowLaplacianOld;
             Rnew = Rold;
+
+            updateVariationalGradientSum(variationalGradSum,variationalGradESum,variationalGrad,variationalGradE);
+
             //cout << "not accepted bitch!!" << endl;
             // Check which slater determinand we need to change -- up or down.
 //            if (iRand >= (nParticles/2)) {
@@ -312,12 +332,19 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
             energySum  = 0.0;
             energy2Sum = 0.0;
             accepted   = 0;
+            variationalGradSum  = zeros(2);
+            variationalGradESum = zeros(2);
         }
     }
 
     // Calculate the expected value of the energy, the energy squared, and the variance.
     energy  = energySum  / ((double) (nCycles - N-1));
     energy2 = energy2Sum / ((double) (nCycles - N-1));
+
+    variationalGradSum  /= ((double) (nCycles - N-1));
+    variationalGradESum /= ((double) (nCycles - N-1));
+
+    variationalGrad = 2*(variationalGradESum - energy * variationalGradSum);
 
     cout << "<E>  = " << setprecision(15) << energy << endl;
     cout << "<E²> = " << setprecision(15) << energy2 << endl;
@@ -326,7 +353,11 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
     cout << "Accepted steps / total steps = " << ((double) accepted) / (nCycles - N-1) << endl;
     cout << "Total steps, nCycles = " << nCycles << endl;
 
-    return energy;
+    vec returnVec = zeros<vec>(3);
+    returnVec(0) = energy;
+    returnVec(1) = variationalGrad(0);
+    returnVec(2) = variationalGrad(1);
+    return returnVec;
 }
 
 
@@ -617,10 +648,6 @@ double VariationalMC::psi_s2_doubleDerivative(double distance) {
 
 
 
-
-
-
-
 void VariationalMC::computeSlaterGradient(mat &Rnew,
                                           mat &r,
                                           mat& slater,
@@ -851,6 +878,100 @@ void VariationalMC::updateCorrelationsMatrix( mat& correlationsMat,
 }
 
 
+/*
+ * Computes the derivative of the logarithm of the jastrow part of the total wave function
+ * with regards to beta.
+ */
+double VariationalMC::computeJastrowBetaDerivative(const mat& R,
+                                                   const mat& correlationsMat) {
+  double sum = 0;
+  for (int i = 0; i < nParticles; i++) {
+    for (int j = i+1; j < nParticles; j++) {
+        sum -= correlationsMat(i,j) * R(i,j) / (1 + beta * R(i,j));
+    }
+  }
+  return sum;
+}
+
+/*
+ * Computes the derivative of the the slater determinands with regards to alpha.
+ */
+double VariationalMC::computeSlaterAlphaDerivative(const mat& R,
+                                                   const mat& slaterInvUp,
+                                                   const mat& slaterInvDown) {
+
+  double sum = 0;
+  for (int i = 0; i < nParticles/2; i++) {
+    for (int j = 0; j < nParticles/2; j++) {
+      sum += slaterAlphaDerivative(j, R(i,i)) * slaterInvUp(i,j);
+    }
+  }
+  for (int i = nParticles/2; i < nParticles; i++) {
+    for (int j = nParticles/2; j < nParticles; j++) {
+      sum += slaterAlphaDerivative(i, R(i,i)) * slaterInvDown(i,j);
+    }
+  }
+  return sum;
+}
 
 
+/*
+ * Choses which wave function to calculate the alpha derivative of from the int
+ * j, then calls the corresponding psi_alphaDerivative.
+ */
+double VariationalMC::slaterAlphaDerivative(int j, double r) {
+    if (j == 0) {
+        return psi_s1_alphaDerivative(r);
+    } else if (j == 1) {
+        return psi_s2_alphaDerivative(r);
+    } else {
+        return 0;
+        cout << "Error is slaterAlphaDerivative" << j<< endl;
+    }
+}
 
+
+double VariationalMC::psi_s1_alphaDerivative(double r) {
+    return -r * exp(-alph * r);
+}
+
+
+double VariationalMC::psi_s2_alphaDerivative(double r) {
+    return (r * r * alph / 4.0 - r) * exp(- alph * r / 2.0);
+}
+
+
+/*
+ * Updates the gradient of the trial wave function with regards to the variational
+ * parameters.
+ */
+void VariationalMC::updateVariationalGradient(mat&        varGradient,
+                                              mat&        varGradientE,
+                                              const mat&  R,
+                                              const mat&  slaterInvUp,
+                                              const mat&  slaterInvDown,
+                                              const mat&  correlationsMat,
+                                              double      E,
+                                              mat&        varGradientSum,
+                                              mat&        varGradientESum) {
+  varGradient(0)   = computeSlaterAlphaDerivative(R, slaterInvUp, slaterInvDown);
+  varGradient(1)   = computeJastrowBetaDerivative(R, correlationsMat);
+  varGradientE(0)  = varGradient(0) * E;
+  varGradientE(1)  = varGradient(1) * E;
+
+  // Updates the sums of the gradient and the gradient * E.
+  updateVariationalGradientSum(varGradientSum, varGradientESum, varGradient, varGradient);
+}
+
+
+/*
+ * Updates the sum of the gradients of the trial wave function with regards
+ * to the variational parameters, alpha and beta.
+ */
+void VariationalMC::updateVariationalGradientSum(mat& varGradientSum,
+                                                 mat& varGradientESum,
+                                                 const mat& varGradient,
+                                                 const mat& varGradientE) {
+  varGradientSum  += varGradient;
+  varGradientESum += varGradientE;
+}
