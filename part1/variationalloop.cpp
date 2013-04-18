@@ -22,24 +22,26 @@ void VariationalLoop::run() {
     vec    energyVarGrad = zeros<vec>(3);
     vec    varGrad       = zeros<vec>(2);
     vec    alphaBeta     = zeros<vec>(2);
-    alphaBeta(0) = 2;
-    alphaBeta(1) = 2;
+    alphaBeta(0) = 1;
+    alphaBeta(1) = 0.5;
 
-    for (int i = 1; i < 100; i++) {
+    for (int i = 1; i < 20; i++) {
         startClock = clock();
 
         // Run one metropolis loop.
         energyVarGrad = m.runMetropolis(alphaBeta(0), alphaBeta(1));
         energy        = energyVarGrad(0);
-        varGrad(0)    = energyVarGrad(1);
+        varGrad(0)    = -energyVarGrad(1);
         varGrad(1)    = energyVarGrad(2);
 
         // Compute new values of alpha / beta.
-        alphaBeta -= (1/i) * varGrad * energy;
+        alphaBeta     -= (1/((double) i)) * 0.1 * varGrad * energy;
+
+        //alphaBeta(1) -=  (1/((double) i)) * 0.01 * varGrad(1) * energy;
 
         if (alphaBeta(0) < 0) {
             alphaBeta(0) = 0.01;
-        } else if (alphaBeta(1) < 0) {
+        } if (alphaBeta(1) < 0) {
             alphaBeta(1) = 0.01;
         }
 
@@ -47,6 +49,8 @@ void VariationalLoop::run() {
         cout << "   * Time usage       = " << (finishClock - startClock) / 1000000.0 << " [s] "<< endl;
         cout << "   * Alpha            = " << alphaBeta(0) << endl;
         cout << "   * Beta             = " << alphaBeta(1) << endl;
+        cout << varGrad << endl;
+        cout << "   * i                = " << i << endl;
         cout << endl << endl;
     }
 
