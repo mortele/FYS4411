@@ -13,7 +13,7 @@ using namespace arma;
 
 /* VMC constructor. */
 VariationalMC::VariationalMC() :
-    nParticles  (2),
+    nParticles  (4),
     nDimensions (3),
     nCycles     (500000),
     N       (2 * nCycles / 10),
@@ -118,13 +118,7 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
     fillCorrelationsMatrix(correlationsNew, spins, Rnew);
 
 
-    // Compute the intial energy.
-    energyUp   = computeKineticEnergyClosedForm(Rnew,coordinatesNew,slaterOldUp, 0);
-    energyDown = computeKineticEnergyClosedForm(Rnew,coordinatesNew,slaterOldDown, 1);
 
-    energyPot = computePotentialEnergyClosedForm(Rnew);
-    energy = energyUp + energyDown + energyPot;
-    //cout << energy << endl;
 
     // Compute the correlation factor in the initial state.
     correlationOld  = computeCorrelation(Rnew);
@@ -147,6 +141,16 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
     slaterGradientOld = slaterGradient;
     computeQuantumForce(quantumForceNew, Rnew,coordinatesNew, jastrowGradient, slaterGradient, energycrossterm);
     computeQuantumForce(quantumForceOld, Rnew, coordinatesNew, jastrowGradient, slaterGradient, energycrossterm);
+
+
+    // Compute the intial energy.
+    energyUp   = computeKineticEnergyClosedForm(Rnew,coordinatesNew,slaterOldUp, 0);
+    energyDown = computeKineticEnergyClosedForm(Rnew,coordinatesNew,slaterOldDown, 1);
+    energyJas  = computeJastrowEnergy(Rnew, jastrowLaplacian, jastrowGradient);
+    energyPot = computePotentialEnergyClosedForm(Rnew);
+    energy = energyUp + energyDown + energyPot + energyJas + energycrossterm;;
+    //cout << energy << endl;
+
     // Metropolis loop.
     for (int k = 0; k < nCycles; k++) {
 
@@ -194,18 +198,18 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
 
         if (iRand >= (nParticles/2)) {
             // Down part.
-            Rsd = computeSlaterRatio(slaterOldDown, Rnew(iRand,iRand), iRand-(nParticles/2)); // *Rc
+            Rsd = computeSlaterRatio(slaterOldDown, Rnew(iRand,iRand), iRand-(nParticles/2));
             computeSlaterGradient(Rnew, coordinatesNew,slaterOldDown, slaterGradient,Rsd, iRand);
         } else {
             // Up part.
-            Rsd = computeSlaterRatio(slaterOldUp, Rnew(iRand,iRand), iRand);  // *Rc
+            Rsd = computeSlaterRatio(slaterOldUp, Rnew(iRand,iRand), iRand);
             computeSlaterGradient(Rnew, coordinatesNew,slaterOldUp, slaterGradient,Rsd, iRand);
         }
-
+        double screwyou = 0;
         computeJastrowGradient(Rnew, jastrowGradient, iRand);
         computeJastrowLaplacian(Rnew, jastrowLaplacian, iRand);
         computeQuantumForce(quantumForceNew, Rnew, coordinatesNew, jastrowGradient, slaterGradient, energycrossterm);
-        computeQuantumForce(quantumForceOld, Rold, coordinatesOld, jastrowGradient, slaterGradientOld, energycrossterm);
+        computeQuantumForce(quantumForceOld, Rold, coordinatesOld, jastrowGradient, slaterGradientOld, screwyou);
 
         // Compute the inside of the exponential term of the difference between Greens functions.
         greensFunction = 0.0;
@@ -220,7 +224,6 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
                 //cout << greensFunction << endl;
             }
         }
-
 
         // Compute the fraction GreensF(new) / GreensF(old).
         greensFunction = exp(greensFunction);
@@ -269,14 +272,15 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
 //                }
             }
             Rold = Rnew;
-
+            double energy1;
             // Compute the energy.
             energyUp   = computeKineticEnergyClosedForm(Rnew,coordinatesNew,slaterNewUp, 0);
             energyDown = computeKineticEnergyClosedForm(Rnew,coordinatesNew,slaterNewDown, 1);
             energyPot  = computePotentialEnergyClosedForm(Rnew);
             energyJas  = computeJastrowEnergy(Rnew, jastrowLaplacian, jastrowGradient);
-            energy = energyUp + energyDown + energyPot + energyJas + energycrossterm;
-            //energy = computeEnergy(Rnew, coordinatesNew, R);
+            energy    =  energyUp + energyDown + energyPot + energyJas + energycrossterm; //
+            //energy     = computeEnergy(Rnew, coordinatesNew, R);
+
         } else {
 
 
@@ -286,18 +290,8 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
             slaterGradient = slaterGradientOld;
             jastrowGradient = jastrowGradientOld;
             jastrowLaplacian = jastrowLaplacianOld;
+            quantumForceNew = quantumForceOld;
             Rnew = Rold;
-            //cout << "not accepted bitch!!" << endl;
-            // Check which slater determinand we need to change -- up or down.
-//            if (iRand >= (nParticles/2)) {
-//                // Down part.
-//               slaterNewDown = slaterOldDown;
-//            } else {
-//                // Up part.
-//                slaterNewUp = slaterOldUp;
-//            }
-
-
         }
 
 
@@ -318,14 +312,12 @@ double VariationalMC::runMetropolis(double alpha, double beta) {
     // Calculate the expected value of the energy, the energy squared, and the variance.
     energy  = energySum  / ((double) (nCycles - N-1));
     energy2 = energy2Sum / ((double) (nCycles - N-1));
-
     cout << "<E>  = " << setprecision(15) << energy << endl;
     cout << "<E²> = " << setprecision(15) << energy2 << endl;
     cout << "Variance  = " << (energy2 - energy*energy)/((double) nCycles) << endl;
     cout << "Std. dev. = " << sqrt((energy2 - energy*energy)/sqrt(nCycles)) << endl;
     cout << "Accepted steps / total steps = " << ((double) accepted) / (nCycles - N-1) << endl;
     cout << "Total steps, nCycles = " << nCycles << endl;
-
     return energy;
 }
 
@@ -359,8 +351,11 @@ double VariationalMC::computeEnergy(mat &R, mat &r, double psi) {
     double b3 = 1/(2 * b2 * b2);
     double prikk = r(0,0) * r(1,0) +  r(0,1) * r(1,1) + r(0,2) * r(1,2);
     double E_L1 = (alph - Z) * (1 / R(0,0)  + 1 / R(1,1)) + 1 / R(0,1) - alph2; // (alph - Z) +  + 1 / R(0,1)
-    double E_L2 = E_L1 + b3 * ( (alph * (R(0,0) + R(1,1))) / (R(0,1))  * (1 - (prikk / (R(0,0) * R(1,1)))) - b3 - 2 / R(0,1) + ((2*beta) / b2));
+    double E_L2 = E_L1  + b3 * ((alph * (R(0,0) + R(1,1))) / (R(0,1))  * (1  - (prikk / (R(0,0) * R(1,1)))) - b3 - 2 / R(0,1) + ((2*beta) / b2)); //
+    //double E_L2 =  b3 * ((alph * (R(0,0) + R(1,1))) / (R(0,1))  * (1 - prikk / (R(0,0) * R(1,1)))); //
+
     return E_L2;
+
 }
 
 //We need to add energycrossterm and the correlation part
@@ -575,7 +570,7 @@ void VariationalMC::computeQuantumForce(mat & QuantumForce, mat &R, mat &r, mat 
             }
             QuantumForce(k,j) = 2*(slaterGradient(k,j) + sum);
             //QuantumForce(k,j) = 2*slaterGradient(k,j);
-            energycrossterm  -= (slaterGradient(k,j) * sum) + sum*sum/2;
+            energycrossterm  -=  sum*sum/2.0 + (slaterGradient(k,j) * sum); //;
         }
     }
 }
@@ -628,7 +623,7 @@ void VariationalMC::computeSlaterGradient(mat &Rnew,
                                           double R,
                                           int particle) {
 
-    int k = particle %2; //the remainder
+    int k = particle %(nParticles / 2); //the remainder
     for (int o = 0; o < nDimensions; o++) {
         double sum = 0;
         for (int j = 0; j < (nParticles / 2); j++) {
@@ -689,11 +684,11 @@ void VariationalMC::computeJastrowGradient(const mat& R, mat& jastrowGradient, i
 
 void VariationalMC::computeJastrowLaplacian(const mat& R, mat& jastrowLaplacian, int particle) {
     for (int i = 0; i<particle; i++) {
-        double factor = 1+beta*R(i,particle);
+        double factor = 1 + beta*R(i,particle);
         jastrowLaplacian(i,particle) = -2*spins(i,particle)*beta/(factor*factor*factor);
     }
     for (int i = particle+1; i < nParticles; i++) {
-        double factor = 1+beta*R(particle,i);
+        double factor = 1 + beta*R(particle,i);
         jastrowLaplacian(particle,i) = -2*spins(particle,i)*beta/(factor*factor*factor);
     }
 }
@@ -702,10 +697,10 @@ double VariationalMC::computeJastrowEnergy(const mat& R, mat& jastrowLaplacian, 
     double sum = 0.0;
     for (int k = 0; k<nParticles; k++) {
         for (int i = 0; i<k; i++) {
-            sum += (nDimensions -1)/R(i,k)*jastrowGradient(i,k) +jastrowLaplacian(i,k);
+            sum +=(nDimensions -1)/R(i,k)*jastrowGradient(i,k) +jastrowLaplacian(i,k);
         }
         for (int i = k+1; i < nParticles; i++) {
-            sum += (nDimensions -1)/R(k,i)*jastrowGradient(k,i) +jastrowLaplacian(k,i);
+            sum +=(nDimensions -1)/R(k,i)*jastrowGradient(k,i) +jastrowLaplacian(k,i);
         }
     }
     return sum/(-2.0);

@@ -29,8 +29,8 @@ void VariationalLoop::run() {
             startClock = clock();
             b = start + ((end-start)/N) * k;
             a = start + ((end-start)/N) * j;
-            b = 0.5;
-            a = 1.8;
+            b = 0.6;
+            a = 3.6;
 
             cout << "/-------------------------------------------------------------\\" << endl;
             printf("|   For parameters:    a = %8.4f,   and    b = %8.4f    |\n", a, b);
