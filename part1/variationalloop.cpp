@@ -41,7 +41,17 @@ void VariationalLoop::run() {
         alphaBeta(1) = alphaBeta(1) + 1/((double) i + 10000) * varGrad(1) * energy;
 
 
+
+    for (int k = 0; k < N; k++) {
+        for (int j = 0; j < N; j++) {
+            startClock = clock();
+            b = start + ((end-start)/N) * k;
+            a = start + ((end-start)/N) * j;
+            b = 0.6;
+            a = 3.6;
+
         //alphaBeta(1) -=  (1/((double) i)) * 0.01 * varGrad(1) * energy;
+
 
         if (alphaBeta(0) < 0) {
             alphaBeta(0) = 0.01;
@@ -56,7 +66,12 @@ void VariationalLoop::run() {
         cout << varGrad << endl;
         cout << "   * i                = " << i << endl;
         cout << endl << endl;
+        }
     }
+    }
+
+}
+
 
 
 
@@ -103,4 +118,4 @@ void VariationalLoop::run() {
 //    cout << "   * |E - E'|              = " << abs(minE - Eexperimental) << endl << endl << endl;
 
 //    outFile.close();
-}
+
