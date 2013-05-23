@@ -15,7 +15,7 @@ using namespace arma;
 VariationalMC::VariationalMC() :
     nParticles  (4),
     nDimensions (3),
-    nCycles     (50000),
+    nCycles     (500000),
     N           (2 * nCycles / 10),
     idum        (time(0)),
     h           (0.00001),
@@ -26,7 +26,7 @@ VariationalMC::VariationalMC() :
     Z           (nParticles),
     stepSize    (0.01),
     D           (0.5),
-    dt          (0.01), // 0.0007
+    dt          (0.005), // 0.0007
     dx          (zeros(nDimensions)),
     spins       (zeros(nParticles,nParticles)) {
 }
@@ -97,7 +97,7 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
     // Fill coordinates matrix with random values.
     for (int i = 0; i < nParticles; i++) {
         for (int j = 0; j < nDimensions; j++) {
-            coordinatesNew(i,j) = gaussian_deviate(&idum) * 2.0/ (alph);
+            coordinatesNew(i,j) = gaussian_deviate(&idum) * 10.0 / (sqrt(alph));
             coordinatesOld(i,j) = coordinatesNew(i,j);
         }
     }
@@ -306,7 +306,7 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
 
 
             //energy = energyUp + energyDown + energyPot + energyJas + energycrossterm;
-            energy = computeEnergy(Rnew, coordinatesNew, R);
+            //energy = computeEnergy(Rnew, coordinatesNew, R);
 
 
             updateVariationalGradient(variationalGrad,
@@ -376,8 +376,8 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
     variationalGradSum  /= ((double) (nCycles - N-1));
     variationalGradESum /= ((double) (nCycles - N-1));
 
-    cout << "d/dt ln * E= " << variationalGradESum << endl;
-    cout << "d/dt ln = " << variationalGradSum*energy << endl;
+    //cout << "d/dt ln = " << variationalGradSum*energy << endl;
+    //cout << "d/dt ln * E= " << variationalGradESum << endl;
 
     variationalGrad = 2*(variationalGradESum - energy * variationalGradSum);
 
@@ -389,15 +389,12 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
     cout << "Accepted steps / total steps = " << ((double) accepted) / (nCycles - N-1) << endl;
     cout << "Total steps, nCycles = " << nCycles << endl;
 
-
-
-
-    vec returnVec = zeros<vec>(3);
+    vec returnVec = zeros<vec>(4);
     returnVec(0) = energy;
     returnVec(1) = variationalGrad(0);
     returnVec(2) = variationalGrad(1);
+    returnVec(3) = ((double) accepted) / (nCycles - N-1);
     return returnVec;
-
 }
 
 
@@ -1111,11 +1108,17 @@ void VariationalMC::updateVariationalGradient(mat&        varGradient,
 
   varGradient(0)   = computeSlaterAlphaDerivative(R, slaterInvUp, slaterInvDown);
   varGradient(1)   = computeJastrowBetaDerivative(R, correlationsMat);
+  //cout << "før: " << varGradient(0) << endl;
+
   varGradientE(0)  = varGradient(0) * E;
   varGradientE(1)  = varGradient(1) * E;
 
+  //cout << "etter: " << varGradientE(0) << endl;
+
+  //cout << "varGrad(0) = " << varGradientSum(0) << "      " << "varGradE(0) = " << varGradientESum(0) << "     E = " << E << endl;
+
   // Updates the sums of the gradient and the gradient * E.
-  updateVariationalGradientSum(varGradientSum, varGradientESum, varGradient, varGradient);
+  updateVariationalGradientSum(varGradientSum, varGradientESum, varGradient, varGradientE);
 }
 
 
