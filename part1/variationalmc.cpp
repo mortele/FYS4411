@@ -15,20 +15,20 @@ using namespace arma;
 VariationalMC::VariationalMC() :
     nParticles  (2),
     nDimensions (3),
-    nCycles     (500000),
-    N       (2 * nCycles / 10),
-    idum    (time(0)),
-    h       (0.00001),
-    h2      (h * h),
-    alph    (1.0),
-    alph2   (alph * alph),
-    beta    (1.0),
-    Z       (nParticles),
-    stepSize(0.01),
-    D       (0.5),
-    dt      (0.01), // 0.0007
-    dx      (zeros(nDimensions)),
-    spins   (zeros(nParticles,nParticles)) {
+    nCycles     (50000),
+    N           (2 * nCycles / 10),
+    idum        (time(0)),
+    h           (0.00001),
+    h2          (h * h),
+    alph        (1.0),
+    alph2       (alph * alph),
+    beta        (1.0),
+    Z           (nParticles),
+    stepSize    (0.01),
+    D           (0.5),
+    dt          (0.01), // 0.0007
+    dx          (zeros(nDimensions)),
+    spins       (zeros(nParticles,nParticles)) {
 }
 
 
@@ -38,17 +38,17 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
     this->alph2 = alph * alph;
     this->beta  = beta;
 
-    mat correlationsOld = zeros<mat>(nParticles, nParticles);
-    mat correlationsNew = zeros<mat>(nParticles, nParticles);
-    mat coordinatesNew  = zeros<mat>(nParticles, nDimensions);
-    mat coordinatesOld  = zeros<mat>(nParticles, nDimensions);
-    mat Rnew            = zeros<mat>(nParticles, nParticles);   // Matrix of distances and magnitudes.
-    mat Rold            = zeros<mat>(nParticles, nParticles);
-    mat slaterOldUp     = zeros<mat>(nParticles/2, nParticles/2);
-    mat slaterOldDown   = zeros<mat>(nParticles/2, nParticles/2);
-    mat slaterNewUp     = zeros<mat>(nParticles/2, nParticles/2);
-    mat slaterNewDown   = zeros<mat>(nParticles/2, nParticles/2);
-    mat slaterGradient  = zeros<mat>(nParticles, nDimensions);
+    mat correlationsOld     = zeros<mat>(nParticles, nParticles);
+    mat correlationsNew     = zeros<mat>(nParticles, nParticles);
+    mat coordinatesNew      = zeros<mat>(nParticles, nDimensions);
+    mat coordinatesOld      = zeros<mat>(nParticles, nDimensions);
+    mat Rnew                = zeros<mat>(nParticles, nParticles);   // Matrix of distances and magnitudes.
+    mat Rold                = zeros<mat>(nParticles, nParticles);
+    mat slaterOldUp         = zeros<mat>(nParticles/2, nParticles/2);
+    mat slaterOldDown       = zeros<mat>(nParticles/2, nParticles/2);
+    mat slaterNewUp         = zeros<mat>(nParticles/2, nParticles/2);
+    mat slaterNewDown       = zeros<mat>(nParticles/2, nParticles/2);
+    mat slaterGradient      = zeros<mat>(nParticles, nDimensions);
     mat slaterGradientOld   = zeros<mat>(nParticles, nDimensions);
     mat jastrowGradient     = zeros<mat>(nParticles, nParticles);
     mat jastrowGradientOld  = zeros<mat>(nParticles, nParticles);
@@ -156,9 +156,9 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
         computeJastrowGradient(Rnew, jastrowGradient, i);
         computeJastrowLaplacian(Rnew, jastrowLaplacian, i);
     }
-    jastrowGradientOld = jastrowGradient;
+    jastrowGradientOld  = jastrowGradient;
     jastrowLaplacianOld = jastrowLaplacian;
-    slaterGradientOld = slaterGradient;
+    slaterGradientOld   = slaterGradient;
     computeQuantumForce(quantumForceNew, Rnew,coordinatesNew, jastrowGradient, slaterGradient, energycrossterm);
     computeQuantumForce(quantumForceOld, Rnew, coordinatesNew, jastrowGradient, slaterGradient, energycrossterm);
 
@@ -204,9 +204,6 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
         updateCorrelationsMatrix(correlationsNew, Rnew, spins, iRand);
         double Rc = computeRc(correlationsOld, correlationsNew, iRand);
 
-
-        //cout << Rc << endl;
-
         if (iRand >= (nParticles/2)) {
             // Down part.
             Rsd = computeSlaterRatio(slaterOldDown, Rnew(iRand,iRand), iRand-(nParticles/2)); // *Rc
@@ -217,10 +214,12 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
             computeSlaterGradient(Rnew, coordinatesNew,slaterOldUp, slaterGradient,Rsd, iRand);
         }
 
-        computeJastrowGradient(Rnew, jastrowGradient, iRand);
-        computeJastrowLaplacian(Rnew, jastrowLaplacian, iRand);
-        computeQuantumForce(quantumForceNew, Rnew, coordinatesNew, jastrowGradient, slaterGradient, energycrossterm);
-        computeQuantumForce(quantumForceOld, Rold, coordinatesOld, jastrowGradient, slaterGradientOld, energycrossterm);
+        computeJastrowGradient  (Rnew, jastrowGradient, iRand);
+        computeJastrowLaplacian (Rnew, jastrowLaplacian, iRand);
+        computeQuantumForce     (quantumForceNew, Rnew, coordinatesNew, jastrowGradient,
+                                 slaterGradient,    energycrossterm);
+        computeQuantumForce     (quantumForceOld, Rold, coordinatesOld, jastrowGradient,
+                                 slaterGradientOld, energycrossterm);
 
         // Compute the inside of the exponential term of the difference between Greens functions.
         greensFunction = 0.0;
@@ -290,8 +289,8 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
             energyDown = computeKineticEnergyClosedForm(Rnew,coordinatesNew,slaterNewDown, 1);
             energyPot  = computePotentialEnergyClosedForm(Rnew);
             energyJas  = computeJastrowEnergy(Rnew, jastrowLaplacian, jastrowGradient);
-            //energy = energyUp + energyDown + energyPot + energyJas + energycrossterm;
-            energy = computeEnergy(Rnew, coordinatesNew, R);
+            energy     = computeEnergy(Rnew, coordinatesNew, R);
+            //energy   = energyUp + energyDown + energyPot + energyJas + energycrossterm;
 
             updateVariationalGradient(variationalGrad,
                                       variationalGradE,
@@ -306,14 +305,15 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
 
 
             // Reject suggested step, energy remains as before.
-            coordinatesNew.row(iRand) = coordinatesOld.row(iRand);
-            correlationsNew = correlationsOld;
-            slaterGradient = slaterGradientOld;
-            jastrowGradient = jastrowGradientOld;
-            jastrowLaplacian = jastrowLaplacianOld;
-            Rnew = Rold;
+            coordinatesNew.row(iRand)   = coordinatesOld.row(iRand);
+            correlationsNew             = correlationsOld;
+            slaterGradient              = slaterGradientOld;
+            jastrowGradient             = jastrowGradientOld;
+            jastrowLaplacian            = jastrowLaplacianOld;
+            Rnew                        = Rold;
 
-            updateVariationalGradientSum(variationalGradSum,variationalGradESum,variationalGrad,variationalGradE);
+            updateVariationalGradientSum(variationalGradSum, variationalGradESum,
+                                         variationalGrad,    variationalGradE);
 
             //cout << "not accepted bitch!!" << endl;
             // Check which slater determinand we need to change -- up or down.
@@ -345,12 +345,17 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
         }
     }
 
+
+
     // Calculate the expected value of the energy, the energy squared, and the variance.
     energy  = energySum  / ((double) (nCycles - N-1));
     energy2 = energy2Sum / ((double) (nCycles - N-1));
 
     variationalGradSum  /= ((double) (nCycles - N-1));
     variationalGradESum /= ((double) (nCycles - N-1));
+
+    cout << "d/dt ln * E= " << variationalGradESum << endl;
+    cout << "d/dt ln = " << variationalGradSum*energy << endl;
 
     variationalGrad = 2*(variationalGradESum - energy * variationalGradSum);
 
@@ -813,9 +818,12 @@ void VariationalMC::evaluateSlater(mat& slater, mat& R, int k) {
 }
 
 
-/* Fills the matrix of spin values, which is used to compute the correlation
-part of the wavefunction. */
+/*
+ * Fills the matrix of spin values, which is used to compute the correlation
+ * part of the wavefunction.
+ */
 void VariationalMC::fillSpinMatrix(mat& spin) {
+
     // Set which electrons have spins up, and which have spins down.
     vec electronSpins(nParticles);
     electronSpins.zeros();
@@ -895,7 +903,7 @@ double VariationalMC::computeJastrowBetaDerivative(const mat& R,
   double sum = 0;
   for (int i = 0; i < nParticles; i++) {
     for (int j = i+1; j < nParticles; j++) {
-        sum -= correlationsMat(i,j) * R(i,j) / (1 + beta * R(i,j));
+      sum -= correlationsMat(i,j) * R(i,j) / (1 + beta * R(i,j));
     }
   }
   return sum;
@@ -917,7 +925,7 @@ double VariationalMC::computeSlaterAlphaDerivative(const mat& R,
   }
   for (int i = 0; i < nParticles/2; i++) {
     for (int j = 0; j < nParticles/2; j++) {
-        sum += slaterAlphaDerivative(i, R(j+nParticles/2,j+nParticles/2)) * slaterInvDown(i,j);
+      sum += slaterAlphaDerivative(i, R(j+nParticles/2,j+nParticles/2)) * slaterInvDown(i,j);
     }
   }
   return sum;
@@ -941,7 +949,7 @@ double VariationalMC::slaterAlphaDerivative(int j, double r) {
 
 
 double VariationalMC::psi_s1_alphaDerivative(double r) {
-    return -r * exp(-alph * r);
+    return (-r) * exp(-alph * r);
 }
 
 
@@ -963,6 +971,7 @@ void VariationalMC::updateVariationalGradient(mat&        varGradient,
                                               double      E,
                                               mat&        varGradientSum,
                                               mat&        varGradientESum) {
+
   varGradient(0)   = computeSlaterAlphaDerivative(R, slaterInvUp, slaterInvDown);
   varGradient(1)   = computeJastrowBetaDerivative(R, correlationsMat);
   varGradientE(0)  = varGradient(0) * E;
