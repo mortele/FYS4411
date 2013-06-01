@@ -101,7 +101,7 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
     // Fill coordinates matrix with random values.
     for (int i = 0; i < nParticles; i++) {
         for (int j = 0; j < nDimensions; j++) {
-            coordinatesNew(i,j) = gaussian_deviate(&idum) * 10.0/ (alph);
+            coordinatesNew(i,j) = gaussian_deviate(&idum) * 10.0 / (sqrt(alph));
             coordinatesOld(i,j) = coordinatesNew(i,j);
         }
     }
@@ -164,9 +164,9 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
         computeJastrowGradient(Rnew, jastrowGradient, i);
         computeJastrowLaplacian(Rnew, jastrowLaplacian, i);
     }
-    jastrowGradientOld = jastrowGradient;
+    jastrowGradientOld  = jastrowGradient;
     jastrowLaplacianOld = jastrowLaplacian;
-    slaterGradientOld = slaterGradient;
+    slaterGradientOld   = slaterGradient;
     computeQuantumForce(quantumForceNew, Rnew,coordinatesNew, jastrowGradient, slaterGradient, energycrossterm);
     computeQuantumForce(quantumForceOld, Rnew, coordinatesNew, jastrowGradient, slaterGradient, energycrossterm);
 //    cout << Rnew << endl;
@@ -221,9 +221,6 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
         updateCorrelationsMatrix(correlationsNew, Rnew, spins, iRand);
         double Rc = computeRc(correlationsOld, correlationsNew, iRand);
 
-
-        //cout << Rc << endl;
-
         if (iRand >= (nParticles/2)) {
             // Down part.
             Rsd = computeSlaterRatio(slaterOldDown, Rnew,coordinatesNew, iRand, iRand-(nParticles/2));
@@ -233,11 +230,13 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
             Rsd = computeSlaterRatio(slaterOldUp, Rnew,coordinatesNew, iRand, iRand);
             computeSlaterGradient(Rnew, coordinatesNew,slaterOldUp, slaterGradient,Rsd, iRand);
         }
+
         double screwyou = 0;
         computeJastrowGradient(Rnew, jastrowGradient, iRand);
         computeJastrowLaplacian(Rnew, jastrowLaplacian, iRand);
         computeQuantumForce(quantumForceNew, Rnew, coordinatesNew, jastrowGradient, slaterGradient, energycrossterm);
         computeQuantumForce(quantumForceOld, Rold, coordinatesOld, jastrowGradient, slaterGradientOld, screwyou);
+
 
         // Compute the inside of the exponential term of the difference between Greens functions.
         greensFunction = 0.0;
@@ -306,12 +305,17 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
             energyPot  = computePotentialEnergyClosedForm(Rnew);
             energyJas  = computeJastrowEnergy(Rnew, jastrowLaplacian, jastrowGradient);
 
+            //energy     = computeEnergy(Rnew, coordinatesNew, R);
+            //energy   = energyUp + energyDown + energyPot + energyJas + energycrossterm;
+
+
             energy    =  energyUp + energyDown + energyPot + energyJas + energycrossterm; //
             //energy     = computeEnergy(Rnew, coordinatesNew, R);
             //cout << energyUp << " " << energyDown << " " << energyPot << endl;
 
             //energy = energyUp + energyDown + energyPot + energyJas + energycrossterm;
             //energy = computeEnergy(Rnew, coordinatesNew, R);
+
 
             updateVariationalGradient(variationalGrad,
                                       variationalGradE,
@@ -337,6 +341,7 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
 
 
             updateVariationalGradientSum(variationalGradSum,variationalGradESum,variationalGrad,variationalGradE);
+
 
             //cout << "not accepted bitch!!" << endl;
             // Check which slater determinand we need to change -- up or down.
@@ -365,6 +370,8 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
         }
     }
 
+
+
     // Calculate the expected value of the energy, the energy squared, and the variance.
     energy  = energySum  / ((double) (nCycles - N-1));
     energy2 = energy2Sum / ((double) (nCycles - N-1));
@@ -372,6 +379,9 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
 
     variationalGradSum  /= ((double) (nCycles - N-1));
     variationalGradESum /= ((double) (nCycles - N-1));
+
+    //cout << "d/dt ln = " << variationalGradSum*energy << endl;
+    //cout << "d/dt ln * E= " << variationalGradESum << endl;
 
     variationalGrad = 2*(variationalGradESum - energy * variationalGradSum);
 
@@ -382,10 +392,12 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
     cout << "Accepted steps / total steps = " << ((double) accepted) / (nCycles - N-1) << endl;
     cout << "Total steps, nCycles = " << nCycles << endl;
 
-    vec returnVec = zeros<vec>(3);
+
+    vec returnVec = zeros<vec>(4);
     returnVec(0) = energy;
     returnVec(1) = variationalGrad(0);
     returnVec(2) = variationalGrad(1);
+    returnVec(3) = ((double) accepted) / (nCycles - N-1);
     return returnVec;
 }
 
@@ -1114,10 +1126,12 @@ void VariationalMC::evaluateSlater(mat& slater, mat& R,mat &r, int k) {
 }
 
 
-
-/* Fills the matrix of spin values, which is used to compute the correlation
-part of the wavefunction. */
+/*
+ * Fills the matrix of spin values, which is used to compute the correlation
+ * part of the wavefunction.
+ */
 void VariationalMC::fillSpinMatrix(mat& spin) {
+
     // Set which electrons have spins up, and which have spins down.
     vec electronSpins(nParticles);
     electronSpins.zeros();
@@ -1197,7 +1211,8 @@ double VariationalMC::computeJastrowBetaDerivative(const mat& R,
   double sum = 0;
   for (int i = 0; i < nParticles; i++) {
     for (int j = i+1; j < nParticles; j++) {
-        sum -= correlationsMat(i,j) * R(i,j) / (1 + beta * R(i,j));
+      //sum -= correlationsMat(i,j) * R(i,j) / (1 + beta * R(i,j));
+      sum -= spins(i,j) * R(i,j)*R(i,j) / ((1 + beta * R(i,j))*(1 + beta * R(i,j)));
     }
   }
   return sum;
@@ -1219,7 +1234,7 @@ double VariationalMC::computeSlaterAlphaDerivative(const mat& R,
   }
   for (int i = 0; i < nParticles/2; i++) {
     for (int j = 0; j < nParticles/2; j++) {
-        sum += slaterAlphaDerivative(i, R(j+nParticles/2,j+nParticles/2)) * slaterInvDown(i,j);
+      sum += slaterAlphaDerivative(i, R(j+nParticles/2,j+nParticles/2)) * slaterInvDown(i,j);
     }
   }
   return sum;
@@ -1243,7 +1258,7 @@ double VariationalMC::slaterAlphaDerivative(int j, double r) {
 
 
 double VariationalMC::psi_s1_alphaDerivative(double r) {
-    return -r * exp(-alph * r);
+    return (-r) * exp(-alph * r);
 }
 
 
@@ -1265,13 +1280,20 @@ void VariationalMC::updateVariationalGradient(mat&        varGradient,
                                               double      E,
                                               mat&        varGradientSum,
                                               mat&        varGradientESum) {
+
   varGradient(0)   = computeSlaterAlphaDerivative(R, slaterInvUp, slaterInvDown);
   varGradient(1)   = computeJastrowBetaDerivative(R, correlationsMat);
+  //cout << "før: " << varGradient(0) << endl;
+
   varGradientE(0)  = varGradient(0) * E;
   varGradientE(1)  = varGradient(1) * E;
 
+  //cout << "etter: " << varGradientE(0) << endl;
+
+  //cout << "varGrad(0) = " << varGradientSum(0) << "      " << "varGradE(0) = " << varGradientESum(0) << "     E = " << E << endl;
+
   // Updates the sums of the gradient and the gradient * E.
-  updateVariationalGradientSum(varGradientSum, varGradientESum, varGradient, varGradient);
+  updateVariationalGradientSum(varGradientSum, varGradientESum, varGradient, varGradientE);
 }
 
 
