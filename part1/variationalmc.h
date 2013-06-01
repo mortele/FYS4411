@@ -20,6 +20,7 @@ class VariationalMC {
         double  alph;
         double  alph2;
         double  beta;
+        double  MolecDist;
         double  Z;
         double  stepSize;
         double  D;
@@ -32,7 +33,7 @@ class VariationalMC {
         double  computePsi(const mat&);
         double  computePsi2(const mat&);
         double  computeEnergy(mat&, mat&, double);
-        double  computeKineticEnergyClosedForm(const mat&, mat &, const mat&, int);
+        double  computeKineticEnergyClosedForm(mat &, mat &, const mat&, int);
         double  computePotentialEnergyClosedForm(const mat&);
         double  computeEnergyNumerical(mat&, mat&, double);
         double  computeDoubleDerivative(double, double, double);
@@ -46,15 +47,15 @@ class VariationalMC {
         double  psi_s2_doubleDerivative(double);
         double  psi_s1_alphaDerivative(double r);
         double  psi_s2_alphaDerivative(double r);
-        double  computeSlaterRatio(const mat&, double, mat&, int, int p);
-        double  slaterPsi(double, mat &r, int i, int);
-        double  psiDerivative(double, mat&,int,int, int);
-        double  psiDoubleDerivative(double,mat &, int,  int);
+        double  computeSlaterRatio(const mat&, mat &, mat&, int, int p);
+        double  slaterPsi(mat &R, mat &r, int i, int);
+        double  psiDerivative(mat &R, mat&, int, int, int);
+        double  psiDoubleDerivative(mat &R, mat &, int,  int);
         double  computeCorrelation(const mat&);
         void    updateRmatrix(const mat&, mat&);
         void    updateForDerivative(mat&, const mat&, int);
         void    fillSpinMatrix(mat&);
-        void    updateSlaterInverse(mat&, const mat&, const mat&, const mat&, mat &r, int, int, double);
+        void    updateSlaterInverse(mat&, const mat&, mat &, const mat&, mat &r, int, int, double);
         void    evaluateSlater(mat&, mat&, mat &r, int);
         //vec   computeQuantumForce(mat&, mat&, double);
         void    computeSlaterGradient(mat&, mat&, mat& , mat &, double, int);

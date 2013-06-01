@@ -9,7 +9,8 @@ SOURCES += main.cpp \
     ../newfunctions.cpp \
     varmc.cpp \
     variationalloop.cpp \
-    wavefunctions.cpp
+    wavefunctions.cpp \
+    H2molecule.cpp
 
 HEADERS += \
     functions.h \

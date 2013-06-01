@@ -13,9 +13,9 @@ using namespace arma;
 
 /* VMC constructor. */
 VariationalMC::VariationalMC() :
-    nParticles  (4),
+    nParticles  (8),
     nDimensions (3),
-    nCycles     (500000),
+    nCycles     (50000),
     N       (2 * nCycles / 10),
     idum    (time(0)),
     h       (0.00001),
@@ -23,8 +23,10 @@ VariationalMC::VariationalMC() :
     alph    (1.0),
     alph2   (alph * alph),
     beta    (1.0),
-    Z       (nParticles),
-    stepSize(0.01),
+    MolecDist (4.6),
+//    Z       (nParticles),
+    Z       (nParticles/2), //for molecules
+    stepSize(0.1),
     D       (0.5),
     dt      (0.01), // 0.0007
     dx      (zeros(nDimensions)),
@@ -42,8 +44,10 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
     mat correlationsNew = zeros<mat>(nParticles, nParticles);
     mat coordinatesNew  = zeros<mat>(nParticles, nDimensions);
     mat coordinatesOld  = zeros<mat>(nParticles, nDimensions);
-    mat Rnew            = zeros<mat>(nParticles, nParticles);   // Matrix of distances and magnitudes.
-    mat Rold            = zeros<mat>(nParticles, nParticles);
+//    mat Rnew            = zeros<mat>(nParticles, nParticles);   // Matrix of distances and magnitudes.
+//    mat Rold            = zeros<mat>(nParticles, nParticles);
+    mat Rnew            = zeros<mat>(nParticles+1, nParticles);   // Matrix of distances and magnitudes. For molecules
+    mat Rold            = zeros<mat>(nParticles+1, nParticles);
     mat slaterOldUp     = zeros<mat>(nParticles/2, nParticles/2);
     mat slaterOldDown   = zeros<mat>(nParticles/2, nParticles/2);
     mat slaterNewUp     = zeros<mat>(nParticles/2, nParticles/2);
@@ -97,14 +101,20 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
     // Fill coordinates matrix with random values.
     for (int i = 0; i < nParticles; i++) {
         for (int j = 0; j < nDimensions; j++) {
-            coordinatesNew(i,j) = gaussian_deviate(&idum) * 2.0/ (alph);
+            coordinatesNew(i,j) = gaussian_deviate(&idum) * 10.0/ (alph);
             coordinatesOld(i,j) = coordinatesNew(i,j);
         }
     }
 
-    // Updates distances and magnitudes in this initial state.
-    updateRmatrix(coordinatesNew, Rnew);
-    updateRmatrix(coordinatesOld, Rold);
+//    // Updates distances and magnitudes in this initial state.
+//    updateRmatrix(coordinatesNew, Rnew);
+//    updateRmatrix(coordinatesOld, Rold);
+
+
+    for(int i=0; i<nParticles;i++) {
+        updateForDerivative(Rnew, coordinatesNew,i);
+        updateForDerivative(Rold, coordinatesNew,i);
+    }
 
     // Evaluate the slater determinand, and find its inverse.
     evaluateSlater(slaterOldUp, Rnew, coordinatesNew, 0);  // Up --> k=0.
@@ -159,8 +169,7 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
     slaterGradientOld = slaterGradient;
     computeQuantumForce(quantumForceNew, Rnew,coordinatesNew, jastrowGradient, slaterGradient, energycrossterm);
     computeQuantumForce(quantumForceOld, Rnew, coordinatesNew, jastrowGradient, slaterGradient, energycrossterm);
-
-
+//    cout << Rnew << endl;
 
     // Compute the intial energy.
     energyUp   = computeKineticEnergyClosedForm(Rnew,coordinatesNew,slaterOldUp, 0);
@@ -179,7 +188,7 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
 
         for (int j = 0; j < nDimensions; j++) {
             // Brute force way:
-            //coordinatesNew(iRand,j) += (ran0(&idum)-0.5) * stepSize;
+//            coordinatesNew(iRand,j) += (ran0(&idum)-0.5) * stepSize;
 
             // Importance sampled way:
             coordinatesNew(iRand, j) += gaussian_deviate(&idum) * sqrt(dt) +
@@ -217,11 +226,11 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
 
         if (iRand >= (nParticles/2)) {
             // Down part.
-            Rsd = computeSlaterRatio(slaterOldDown, Rnew(iRand,iRand),coordinatesNew, iRand, iRand-(nParticles/2));
+            Rsd = computeSlaterRatio(slaterOldDown, Rnew,coordinatesNew, iRand, iRand-(nParticles/2));
             computeSlaterGradient(Rnew, coordinatesNew,slaterOldDown, slaterGradient,Rsd, iRand);
         } else {
             // Up part.
-            Rsd = computeSlaterRatio(slaterOldUp, Rnew(iRand,iRand),coordinatesNew, iRand, iRand);
+            Rsd = computeSlaterRatio(slaterOldUp, Rnew,coordinatesNew, iRand, iRand);
             computeSlaterGradient(Rnew, coordinatesNew,slaterOldUp, slaterGradient,Rsd, iRand);
         }
         double screwyou = 0;
@@ -243,10 +252,10 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
                 //cout << greensFunction << endl;
             }
         }
-
+        //cout << "Rold : \n \n \n"<< Rold << endl;
         // Compute the fraction GreensF(new) / GreensF(old).
         greensFunction = exp(greensFunction);
-        //cout << greensFunction << endl;
+//        cout <<greensFunction << endl;
         R= Rsd*Rc;
         // Check if the suggested move is accepted
         ecoeff =  R * R * greensFunction;
@@ -260,7 +269,6 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
 //            cout << slaterGradientOld << endl;
 //            cout << quantumForceOld << endl;
 //        }
-
 
         if (ecoeff > ran0(&idum)) {
             // Accept new step, calculate new energy.
@@ -300,10 +308,10 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
 
             energy    =  energyUp + energyDown + energyPot + energyJas + energycrossterm; //
             //energy     = computeEnergy(Rnew, coordinatesNew, R);
-
+            //cout << energyUp << " " << energyDown << " " << energyPot << endl;
 
             //energy = energyUp + energyDown + energyPot + energyJas + energycrossterm;
-            energy = computeEnergy(Rnew, coordinatesNew, R);
+            //energy = computeEnergy(Rnew, coordinatesNew, R);
 
             updateVariationalGradient(variationalGrad,
                                       variationalGradE,
@@ -339,11 +347,7 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
 //                // Up part.
 //                slaterNewUp = slaterOldUp;
 //            }
-
-
-
         }
-
 
 
         // Add energy of this state to the energy sum.
@@ -371,7 +375,6 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
 
     variationalGrad = 2*(variationalGradESum - energy * variationalGradSum);
 
-
     cout << "<E>  = " << setprecision(15) << energy << endl;
     cout << "<E²> = " << setprecision(15) << energy2 << endl;
     cout << "Variance  = " << (energy2 - energy*energy)/((double) nCycles) << endl;
@@ -379,15 +382,11 @@ vec VariationalMC::runMetropolis(double alpha, double beta) {
     cout << "Accepted steps / total steps = " << ((double) accepted) / (nCycles - N-1) << endl;
     cout << "Total steps, nCycles = " << nCycles << endl;
 
-
-
-
     vec returnVec = zeros<vec>(3);
     returnVec(0) = energy;
     returnVec(1) = variationalGrad(0);
     returnVec(2) = variationalGrad(1);
     return returnVec;
-
 }
 
 
@@ -423,29 +422,44 @@ double VariationalMC::computeEnergy(mat &R, mat &r, double psi) {
     double E_L1 = (alph - Z) * (1 / R(0,0)  + 1 / R(1,1)) + 1 / R(0,1) - alph2; // (alph - Z) +  + 1 / R(0,1)
     double E_L2 = E_L1  + b3 * ((alph * (R(0,0) + R(1,1))) / (R(0,1))  * (1  - (prikk / (R(0,0) * R(1,1)))) - b3 - 2 / R(0,1) + ((2*beta) / b2)); //
     //double E_L2 =  b3 * ((alph * (R(0,0) + R(1,1))) / (R(0,1))  * (1 - prikk / (R(0,0) * R(1,1)))); //
-
     return E_L2;
-
 }
 
 //We need to add energycrossterm and the correlation part
-double VariationalMC::computeKineticEnergyClosedForm(const mat& R, mat& r, const mat& slater, int k) {
+double VariationalMC::computeKineticEnergyClosedForm( mat& R, mat& r, const mat& slater, int k) {
     double returnVal = 0.0;
     int o = nParticles/2*k;
     for (int i = 0; i < nParticles/2; i++) {
         for (int j = 0; j < nParticles/2; j++) {
-            returnVal += psiDoubleDerivative(R(i+o,i+o),r,i, j) * slater(j,i);
+            returnVal += psiDoubleDerivative(R,r,i+o, j) * slater(j,i);
         }
     }
     return returnVal / (-2.0);
 }
 
+//double VariationalMC::computePotentialEnergyClosedForm(const mat& R) {
+//    double returnVal = 0.0;
+//    double E1 = 0.0;
+//    // Compute the commutative part of H.
+//    for(int i = 0; i < nParticles; i++) {
+//        returnVal -= Z/R(i,i);
+
+//        for(int j = i+1; j<nParticles; j++) {
+//            E1 += 1/R(i,j);
+//        }
+//    }
+
+//    return returnVal; // + E1;
+//}
+
 double VariationalMC::computePotentialEnergyClosedForm(const mat& R) {
     double returnVal = 0.0;
     double E1 = 0.0;
+    returnVal = Z*Z/MolecDist;
     // Compute the commutative part of H.
     for(int i = 0; i < nParticles; i++) {
         returnVal -= Z/R(i,i);
+        returnVal -= Z/R(i+1,i);
 
         for(int j = i+1; j<nParticles; j++) {
             E1 += 1/R(i,j);
@@ -454,7 +468,6 @@ double VariationalMC::computePotentialEnergyClosedForm(const mat& R) {
 
     return returnVal + E1;
 }
-
 
 /* Computes the local energy, by numerical differentiation, of a state defined by position matrix r, and distance matrix R.
  * EL = 1/psi * H * psi */
@@ -568,11 +581,44 @@ void VariationalMC::updateRmatrix(const mat &r, mat &R) {
 }
 
 
+///* Updates the distance matrix when we have just changed one coordinate of particle "i"
+// * (like we do when computing the derivative)*/
+//void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
+
+//    double dxx, sum;
+//    for(int k=0; k<i; k++) {
+//        sum = 0;
+//        for(int l =0;l<nDimensions;l++){
+//            dxx = r(i,l) - r(k,l);
+//            sum += dxx*dxx;
+//        }
+//        R(k,i) = sqrt(sum); //R is the matrix of distances
+//    }
+
+//    for(int k=i+1;k<nParticles;k++){
+//        sum = 0;
+//        for(int l =0;l<nDimensions;l++){
+//            dxx = r(i,l) - r(k,l);;
+//            sum += dxx*dxx;
+//        }
+//        R(i,k) = sqrt(sum); //R is the matrix of distances
+//    }
+
+//    sum = 0;
+//    for(int l =0;l<nDimensions;l++){
+//        dxx = r(i,l); //r[l+i*nDimensions]*r[l+i*nDimensions];
+//        sum += dxx*dxx;
+//    }
+//    R(i,i) = sqrt(sum);
+//}
+
 /* Updates the distance matrix when we have just changed one coordinate of particle "i"
  * (like we do when computing the derivative)*/
-void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
 
+//version for calculating molecules
+void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
     double dxx, sum;
+    double dist2 = MolecDist/2.0;
     for(int k=0; k<i; k++) {
         sum = 0;
         for(int l =0;l<nDimensions;l++){
@@ -594,10 +640,26 @@ void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
     sum = 0;
     for(int l =0;l<nDimensions;l++){
         dxx = r(i,l); //r[l+i*nDimensions]*r[l+i*nDimensions];
-        sum += dxx*dxx;
+        if (l==0) {
+            sum +=(dxx-dist2)*(dxx-dist2);
+        } else {
+            sum += dxx*dxx;
+        }
     }
     R(i,i) = sqrt(sum);
+    sum = 0;
+    for(int l =0;l<nDimensions;l++){
+        dxx = r(i,l); //r[l+i*nDimensions]*r[l+i*nDimensions];
+        if (l==0) {
+            sum +=(dxx+dist2)*(dxx+dist2);
+        } else {
+            sum += dxx*dxx;
+        }
+    }
+    R(i+1,i) = sqrt(sum);
 }
+
+
 
 
 /* Computes the quantum force. Uses numerical differentiation to find the gradient of Psi. */
@@ -639,8 +701,9 @@ void VariationalMC::computeQuantumForce(mat & QuantumForce, mat &R, mat &r, mat 
             for (int i = k+1; i < nParticles; i++) {
                 sum -= (r(i,j)-r(k,j))/R(k,i)*jastrowGradient(k,i);
             }
+
             QuantumForce(k,j) = 2*(slaterGradient(k,j) + sum);
-            //QuantumForce(k,j) = 2*slaterGradient(k,j);
+//            QuantumForce(k,j) = 2*slaterGradient(k,j);
             energycrossterm  -=  sum*sum/2.0 + (slaterGradient(k,j) * sum); //;
         }
     }
@@ -664,20 +727,26 @@ double VariationalMC::psi_s2(double distance){
 
 double VariationalMC::psi_p2z(double distance, mat &r1, int i){
     double r = distance;
-    double z = r1(i,2);
-    return pow(6, 1./2)*pow(alph, 5./2)*r*z*exp(-alph*r/2)/12;
+//    double z = r1(i,2);
+    return r1(i,2)*exp(-alph*r/2);
 }
+
+//double VariationalMC::psi_p2z(double distance, mat &r1, int i){
+//    double r = distance;
+//    double z = r1(i,2);
+//    return r*z*exp(-alph*r/2)/12;
+//}
 
 double VariationalMC::psi_p2y(double distance, mat &r1, int i){
     double r = distance;
-    double y = r1(i,1);
-    return pow(6, 1./2)*pow(alph, 5./2)*r*y*exp(-alph*r/2)/12;
+//    double y = r1(i,1);
+    return r1(i,1)*exp(-alph*r/2);
 }
 
 double VariationalMC::psi_p2x(double distance, mat &r1, int i){
     double r = distance;
-    double x = r1(i,0);
-    return pow(6, 1./2)*pow(alph, 5./2)*r*x*exp(-alph*r/2)/12;
+//    double x = r1(i,0);
+    return r1(i,0)*exp(-alph*r/2);
 }
 
 double VariationalMC::psi_s1_derivative(double distance, double coord) { //distance is r, coord is x,y or z
@@ -688,54 +757,71 @@ double VariationalMC::psi_s2_derivative(double distance,double coord) { //distan
     return 1/4.*alph*(alph*distance - 4)*coord *exp(-alph*distance/2)/distance;
 }
 
-double VariationalMC::psi_p2z_derivative(double distance, mat &r1, int i, int j) { //distance is r, coord is x,y or z
+double VariationalMC::psi_p2z_derivative(double distance, mat &r1, int i, int j) { //distance is r, i is which particle, j is which coordinate
     double r = distance;
     double x = r1(i,0);
     double y = r1(i,1);
     double z = r1(i,2);
     if (j == 0) {
-        return -sqrt(6)*pow(alph, 5.0/2.0)*x*z*(alph*r - 2)*exp(-alph*r/2)/(24*r);
+        return -alph*x*z*exp(-alph*r/2)/(2*r);
     }
     else if (j == 1) {
-        return -sqrt(6)*pow(alph, 5.0/2.0)*y*z*(alph*r - 2)*exp(-alph*r/2)/(24*r);
+        return -alph*y*z*exp(-alph*r/2)/(2*r);
     }
     else if (j == 2){
-        return -sqrt(6)*pow(alph, 5.0/2.0)*(alph*r*pow(z, 2) - 2*pow(r, 2) - 2*pow(z, 2))*exp(-alph*r/2)/(24*r);
+        return -(alph*pow(z, 2) - 2*r)*exp(-alph*r/2)/(2*r);
+    }
+}
+
+//double VariationalMC::psi_p2z_derivative(double distance, mat &r1, int i, int j) { //distance is r, coord is x,y or z
+//    double r = distance;
+//    double x = r1(i,0);
+//    double y = r1(i,1);
+//    double z = r1(i,2);
+//    if (j == 0) {
+//        return -x*z*(alph*r - 2)*exp(-alph*r/2)/(24*r);
+//    }
+//    else if (j == 1) {
+//        return -y*z*(alph*r - 2)*exp(-alph*r/2)/(24*r);
+//    }
+//    else if (j == 2){
+//        return -(alph*r*pow(z, 2) - 2*pow(r, 2) - 2*pow(z, 2))*exp(-alph*r/2)/(24*r);
+//    }
+//}
+
+
+
+
+double VariationalMC::psi_p2y_derivative(double distance, mat &r1, int i, int j) { //distance is r, i is  which particle, j is which coordinate
+    double r = distance;
+    double x = r1(i,0);
+    double y = r1(i,1);
+    double z = r1(i,2);
+    if (j == 0) {
+        return -alph*x*y*exp(-alph*r/2)/(2*r);
+    }
+    else if (j == 1) {
+        return -(alph*pow(y, 2) - 2*r)*exp(-alph*r/2)/(2*r);
+    }
+    else if (j == 2){
+        return -alph*y*z*exp(-alph*r/2)/(2*r);
     }
 }
 
 
-double VariationalMC::psi_p2y_derivative(double distance, mat &r1, int i, int j) { //distance is r, coord is x,y or z
+double VariationalMC::psi_p2x_derivative(double distance, mat &r1, int i, int j) { //distance is r, i is  which particle, j is which coordinate
     double r = distance;
     double x = r1(i,0);
     double y = r1(i,1);
     double z = r1(i,2);
     if (j == 0) {
-        return -sqrt(6)*pow(alph, 5.0/2.0)*x*y*(alph*r - 2)*exp(-alph*r/2)/(24*r);
+        return -(alph*pow(x, 2) - 2*r)*exp(-alph*r/2)/(2*r);
     }
-
     else if (j == 1) {
-        return -sqrt(6)*pow(alph, 5.0/2.0)*(alph*r*pow(y, 2) - 2*pow(r, 2) - 2*pow(y, 2))*exp(-alph*r/2)/(24*r);
+        return -alph*x*y*exp(-alph*r/2)/(2*r);
     }
     else if (j == 2){
-        return -sqrt(6)*pow(alph, 5.0/2.0)*y*z*(alph*r - 2)*exp(-alph*r/2)/(24*r);
-    }
-}
-
-double VariationalMC::psi_p2x_derivative(double distance, mat &r1, int i, int j) { //distance is r, coord is x,y or z
-    double r = distance;
-    double x = r1(i,0);
-    double y = r1(i,1);
-    double z = r1(i,2);
-    if (j == 0) {
-        return -sqrt(6)*pow(alph, 5.0/2.0)*(alph*r*pow(x, 2) - 2*pow(r, 2) - 2*pow(x, 2))*exp(-alph*r/2)/(24*r);
-    }
-
-    else if (j == 1) {
-        return -sqrt(6)*pow(alph, 5.0/2.0)*x*y*(alph*r - 2)*exp(-alph*r/2)/(24*r);
-    }
-    else if (j == 2){
-        return -sqrt(6)*pow(alph, 5.0/2.0)*x*z*(alph*r - 2)*exp(-alph*r/2)/(24*r);
+        return -alph*x*z*exp(-alph*r/2)/(2*r);
     }
 }
 
@@ -751,19 +837,24 @@ double VariationalMC::psi_s2_doubleDerivative(double distance) {
 double VariationalMC::psi_p2z_doubleDerivative(double distance, mat &r1, int i){ //we can save alot here since this is the same expression for each of the coordinates
     double r = distance;
     double z = r1(i,2);
-    return sqrt(6)*pow(alph, 5.0/2.0)*z*(alph*alph*r*r - 12*alph*r + 16)*exp(-alph*r/2)/(48*r);
+    return alph*z*(alph*r - 8)*exp(-alph*r/2)/(4*r);
 }
+//double VariationalMC::psi_p2z_doubleDerivative(double distance, mat &r1, int i){ //we can save alot here since this is the same expression for each of the coordinates
+//    double r = distance;
+//    double z = r1(i,2);
+//    return z*(alph*alph*r*r - 12*alph*r + 16)*exp(-alph*r/2)/(48*r);
+//}
 
 double VariationalMC::psi_p2y_doubleDerivative(double distance, mat &r1, int i){
     double r = distance;
     double y = r1(i,1);
-    return sqrt(6)*pow(alph, 5.0/2.0)*y*(alph*alph*r*r - 12*alph*r + 16)*exp(-alph*r/2)/(48*r);
+    return alph*y*(alph*r - 8)*exp(-alph*r/2)/(4*r);
 }
 
 double VariationalMC::psi_p2x_doubleDerivative(double distance, mat &r1, int i){
     double r = distance;
     double x = r1(i,0);
-    return sqrt(6)*pow(alph, 5.0/2.0)*x*(alph*alph*r*r - 12*alph*r + 16)*exp(-alph*r/2)/(48*r);
+    return alph*x*(alph*r - 8)*exp(-alph*r/2)/(4*r);
 }
 
 
@@ -780,7 +871,7 @@ void VariationalMC::computeSlaterGradient(mat &Rnew,
     for (int o = 0; o < nDimensions; o++) {
         double sum = 0;
         for (int j = 0; j < (nParticles / 2); j++) {
-            sum += psiDerivative(Rnew(particle,particle),r,particle, o, j)*slater(j,k);
+            sum += psiDerivative(Rnew,r,particle, o, j)*slater(j,k);
         }
         gradient(particle,o) = 1.0/R * sum;
 //        if (abs(gradient(particle,o))> 20 ) {
@@ -793,45 +884,102 @@ void VariationalMC::computeSlaterGradient(mat &Rnew,
 }
 
 
-double VariationalMC::psiDerivative(double distance, mat &r, int i, int j, int k) {
+double VariationalMC::psiDerivative(mat &R, mat &r, int i, int j, int k) {
+    double distance = R(i,i);
+    double distance2 = R(i+1,i);
+    double R2 = MolecDist/2;
     if (k == 0) {
-        return psi_s1_derivative(distance,r(i,j));
+        if (j==0)
+            return psi_s1_derivative(distance,r(i,j)-R2) + psi_s1_derivative(distance2,r(i,j)+R2);
+        else
+            return psi_s1_derivative(distance,r(i,j)) + psi_s1_derivative(distance2,r(i,j));
+
     } else if (k == 1) {
-        return psi_s2_derivative(distance,r(i,j));
+        if (j==0)
+            return psi_s1_derivative(distance,r(i,j)-R2) - psi_s1_derivative(distance2,r(i,j)+R2);
+        else
+            return psi_s1_derivative(distance,r(i,j)) - psi_s1_derivative(distance2,r(i,j));
     } else if (k == 2) {
-        return psi_p2z_derivative(distance,r,i,j);
+        if (j==0)
+            return psi_s2_derivative(distance,r(i,j)-R2) + psi_s2_derivative(distance2,r(i,j)+R2);
+        else
+            return psi_s2_derivative(distance,r(i,j)) + psi_s2_derivative(distance2,r(i,j));
     } else if (k == 3) {
-        return psi_p2y_derivative(distance,r,i,j);
+        if (j==0)
+            return psi_s2_derivative(distance,r(i,j)-R2) - psi_s2_derivative(distance2,r(i,j)+R2);
+        else
+            return psi_s2_derivative(distance,r(i,j)) - psi_s2_derivative(distance2,r(i,j));
     } else if (k == 4) {
-        return psi_p2x_derivative(distance,r,i,j);
+        return psi_p2z_derivative(distance,r,i,j);
     } else {
         return 0;
         cout << "Error in psiDerivative: k = " << k  << endl;
     }
 }
 
-double VariationalMC::psiDoubleDerivative(double distance, mat &r, int i, int j) {
+double VariationalMC::psiDoubleDerivative(mat &R, mat &r, int i, int j) {
+    double distance = R(i,i);
+    double distance2 = R(i+1,i);
     if (j == 0) {
-        return psi_s1_doubleDerivative(distance);
+        return psi_s1_doubleDerivative(distance) + psi_s1_doubleDerivative(distance2);
     } else if (j == 1) {
-        return psi_s2_doubleDerivative(distance);
+        return psi_s1_doubleDerivative(distance) - psi_s1_doubleDerivative(distance2);
     } else if (j == 2) {
-        return psi_p2z_doubleDerivative(distance,r,i);
+        return psi_s2_doubleDerivative(distance) + psi_s2_doubleDerivative(distance2);
     } else if (j == 3) {
-        return psi_p2y_doubleDerivative(distance,r,i);
+        return psi_s2_doubleDerivative(distance) - psi_s2_doubleDerivative(distance2);
     } else if (j == 4) {
-        return psi_p2x_doubleDerivative(distance,r,i);
+        return psi_p2z_doubleDerivative(distance,r,i);
     } else {
         return 0;
-        cout << "Error in psiDoubleDerivative: j = " << j  << endl;
+        cout << "Error in psiDoubleDerivative: j = " <<  j  << endl;
     }
 }
 
+//double VariationalMC::psiDerivative(mat &R, mat &r, int i, int j, int k) {
+//    double distance = R(i,i);
+//    if (k == 0) {
 
-double VariationalMC::computeSlaterRatio(const mat& slaterInverseOld, double distance, mat &r, int i, int p) {
+//        return psi_s1_derivative(distance,r(i,j));
+
+//    } else if (k == 1) {
+//        return psi_s2_derivative(distance,r(i,j));
+//    } else if (k == 2) {
+//        return psi_p2x_derivative(distance,r,i,j);
+//    } else if (k == 3) {
+//        return psi_p2y_derivative(distance,r,i,j);
+//    } else if (k == 4) {
+//        return psi_p2z_derivative(distance,r,i,j);
+//    } else {
+//        return 0;
+//        cout << "Error in psiDerivative: k = " << k  << endl;
+//    }
+//}
+
+//double VariationalMC::psiDoubleDerivative(mat &R, mat &r, int i, int j) {
+//    double distance = R(i,i);
+
+//    if (j == 0) {
+//        return psi_s1_doubleDerivative(distance);
+//    } else if (j == 1) {
+//        return psi_s2_doubleDerivative(distance);
+//    } else if (j == 2) {
+//        return psi_p2x_doubleDerivative(distance,r,i);
+//    } else if (j == 3) {
+//        return psi_p2y_doubleDerivative(distance,r,i);
+//    } else if (j == 4) {
+//        return psi_p2z_doubleDerivative(distance,r,i);
+//    } else {
+//        return 0;
+//        cout << "Error in psiDoubleDerivative: j = " <<  j  << endl;
+//    }
+//}
+
+
+double VariationalMC::computeSlaterRatio(const mat& slaterInverseOld, mat &R, mat &r, int i, int p) {
     double Rsd = 0;
     for (int j = 0; j < (nParticles / 2); j++) {
-        Rsd += slaterPsi(distance,r,i, j) * slaterInverseOld(j,p);
+        Rsd += slaterPsi(R,r,i, j) * slaterInverseOld(j,p);
     }
     return Rsd;
 }
@@ -871,18 +1019,39 @@ double VariationalMC::computeJastrowEnergy(const mat& R, mat& jastrowLaplacian, 
     return sum/(-2.0);
 }
 
-/* Choses which wave function to calculate from the int j, then calls the corresponding psi_j. */
-double VariationalMC::slaterPsi(double distance, mat &r, int i, int j) {
+///* Choses which wave function to calculate from the int j, then calls the corresponding psi_j. */
+//double VariationalMC::slaterPsi(mat &R, mat &r, int i, int j) {
+//    double distance = R(i,i);
+//    if (j == 0) {
+//        return psi_s1(distance);
+//    } else if (j == 1) {
+//        return psi_s2(distance);
+//    } else if (j == 2) {
+//        return psi_p2x(distance,r,i);
+//    } else if (j == 3) {
+//        return psi_p2y(distance,r,i);
+//    } else if (j == 4) {
+//        return psi_p2z(distance,r,i);
+//    } else {
+//        return 0;
+//        cout << "Error in slaterPsi" << j<< endl;
+//    }
+//}
+
+/* Choses which wave function to calculate from the int j, then calls the corresponding psi_j. */ //FOR MOLECULES
+double VariationalMC::slaterPsi(mat &R, mat &r, int i, int j) {
+    double distance = R(i,i);
+    double distance2 = R(i+1,i);
     if (j == 0) {
-        return psi_s1(distance);
+        return psi_s1(distance) + psi_s1(distance2);
     } else if (j == 1) {
-        return psi_s2(distance);
+        return psi_s1(distance) - psi_s1(distance2);
     } else if (j == 2) {
-        return psi_p2z(distance,r,i);
+        return psi_s2(distance) + psi_s2(distance2);
     } else if (j == 3) {
-        return psi_p2y(distance,r,i);
+        return psi_s2(distance) - psi_s2(distance2);
     } else if (j == 4) {
-        return psi_p2x(distance,r,i);
+        return psi_p2z(distance,r,i);
     } else {
         return 0;
         cout << "Error in slaterPsi" << j<< endl;
@@ -909,7 +1078,7 @@ double VariationalMC::computeCorrelation(const mat& R) {
 /* Updates the inverse of one part of the slater determinand (up, or down part). */
 void VariationalMC::updateSlaterInverse(mat&        slaterNew,
                                         const mat&  slaterOld,
-                                        const mat&  Rnew,
+                                        mat&  Rnew,
                                         const mat&  Rold,
                                         mat&        r,
                                         int         i,
@@ -921,7 +1090,7 @@ void VariationalMC::updateSlaterInverse(mat&        slaterNew,
             if(j != i) {
                 double sum = 0;
                 for( int l = 0; l< nParticles/2; l++) {
-                    sum += slaterOld(l,j) * slaterPsi(Rnew(o,o),r,i, l);
+                    sum += slaterOld(l,j) * slaterPsi(Rnew,r,o, l);
                 }
                 slaterNew(k,j) = slaterOld(k,j) - slaterOld(k,i) * sum / R;
             }
@@ -939,10 +1108,11 @@ void VariationalMC::evaluateSlater(mat& slater, mat& R,mat &r, int k) {
 
     for (int i = 0; i < (nParticles/2); i++) {
         for (int j = 0; j < (nParticles/2); j++) {
-            slater(i,j) = slaterPsi(R(i+offset,i+offset),r,i, j);
+            slater(i,j) = slaterPsi(R,r,i+offset, j);
         }
     }
 }
+
 
 
 /* Fills the matrix of spin values, which is used to compute the correlation

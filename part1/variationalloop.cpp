@@ -22,38 +22,42 @@ void VariationalLoop::run() {
     vec    energyVarGrad = zeros<vec>(3);
     vec    varGrad       = zeros<vec>(2);
     vec    alphaBeta     = zeros<vec>(2);
-    alphaBeta(0) = 1;
-    alphaBeta(1) = 0.5;
+    alphaBeta(0) = 3.5;
+    alphaBeta(1) = 0.7;
+
+
+
 
     for (int i = 1; i < 20; i++) {
         startClock = clock();
 
         // Run one metropolis loop.
         energyVarGrad = m.runMetropolis(alphaBeta(0), alphaBeta(1));
+
         energy        = energyVarGrad(0);
         varGrad(0)    = -energyVarGrad(1);
         varGrad(1)    = energyVarGrad(2);
 
         // Compute new values of alpha / beta.
-        alphaBeta     -= (1/((double) i)) * 0.1 * varGrad * energy;
+        //alphaBeta     -= (1/((double) i)) * 0.1 * varGrad * energy;
 
 
-    for (int k = 0; k < N; k++) {
-        for (int j = 0; j < N; j++) {
-            startClock = clock();
-            b = start + ((end-start)/N) * k;
-            a = start + ((end-start)/N) * j;
-            b = 0.6;
-            a = 3.6;
+//    for (int k = 0; k < N; k++) {
+//        for (int j = 0; j < N; j++) {
+//            startClock = clock();
+//            b = start + ((end-start)/N) * k;
+//            a = start + ((end-start)/N) * j;
+//            b = 0.6;
+//            a = 3.6;
 
-        //alphaBeta(1) -=  (1/((double) i)) * 0.01 * varGrad(1) * energy;
+//        //alphaBeta(1) -=  (1/((double) i)) * 0.01 * varGrad(1) * energy;
 
 
-        if (alphaBeta(0) < 0) {
-            alphaBeta(0) = 0.01;
-        } if (alphaBeta(1) < 0) {
-            alphaBeta(1) = 0.01;
-        }
+//        if (alphaBeta(0) < 0) {
+//            alphaBeta(0) = 0.01;
+//        } if (alphaBeta(1) < 0) {
+//            alphaBeta(1) = 0.01;
+//        }
 
         finishClock = clock();
         cout << "   * Time usage       = " << (finishClock - startClock) / 1000000.0 << " [s] "<< endl;
@@ -63,8 +67,8 @@ void VariationalLoop::run() {
         cout << "   * i                = " << i << endl;
         cout << endl << endl;
         }
-    }
-    }
+//    }
+//    }
 
 }
 
