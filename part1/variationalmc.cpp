@@ -15,7 +15,7 @@ using namespace arma;
 VariationalMC::VariationalMC() :
     nParticles  (4),
     nDimensions (3),
-    nCycles     (500000),
+    nCycles     (50000),
     N           (2 * nCycles / 10),
     idum        (time(0)),
     h           (0.00001),
@@ -1037,7 +1037,8 @@ double VariationalMC::computeJastrowBetaDerivative(const mat& R,
   double sum = 0;
   for (int i = 0; i < nParticles; i++) {
     for (int j = i+1; j < nParticles; j++) {
-      sum -= correlationsMat(i,j) * R(i,j) / (1 + beta * R(i,j));
+      //sum -= correlationsMat(i,j) * R(i,j) / (1 + beta * R(i,j));
+      sum -= spins(i,j) * R(i,j)*R(i,j) / ((1 + beta * R(i,j))*(1 + beta * R(i,j)));
     }
   }
   return sum;

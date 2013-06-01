@@ -22,7 +22,7 @@ void VariationalLoop::run() {
     vec    energyVarGrad = zeros<vec>(4);
     vec    varGrad       = zeros<vec>(2);
     vec    alphaBeta     = zeros<vec>(2);
-    alphaBeta(0) = 3.7;
+    alphaBeta(0) = 3.67;
     alphaBeta(1) = 0.2;
 
     for (int i = 1; i < 20000; i++) {
@@ -37,13 +37,18 @@ void VariationalLoop::run() {
 
         if (accepted > 0.95) {
             // Compute new values of alpha / beta.
-            alphaBeta     += (1/((double) i + 100)) * varGrad * energy;
+            alphaBeta     += (1/((double) 15*i + 100)) * varGrad * energy;
             //alphaBeta(0)   = 3.7;
             //alphaBeta(1) = alphaBeta(1) + 1/((double) i + 10) * varGrad(1) * energy;
         } else {
             cout << "\n\n\n\n\n\naccepted  = "<< accepted << " < 0.95 \n\n\n\n\n";
         }
 
+        if (alphaBeta(0) < 0) {
+            alphaBeta(0) = 0.01;
+        } if (alphaBeta(1) < 0) {
+            alphaBeta(1) = 0.01;
+        }
 
         /*
         for (int k = 0; k < N; k++) {
@@ -71,7 +76,7 @@ void VariationalLoop::run() {
         cout << "delta alphaBeta =" << (1/((double) i + 100)) * varGrad * energy << endl;
         cout << "   * i                = " << i << endl;
         cout << endl << endl;
-        }
+    }
 
 }
 
