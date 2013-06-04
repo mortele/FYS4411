@@ -5,9 +5,10 @@
 
 
 VariationalLoop::VariationalLoop() {
+
 }
 
-void VariationalLoop::initialize_helium() {
+void VariationalLoop::initialize_helium(int my_rank) {
     this->N     = 40;
     this->start = 2.0;
     this->end   = 4.0;
@@ -15,6 +16,7 @@ void VariationalLoop::initialize_helium() {
     this->minE  = 1e300;
     this->minA  = 0.0;
     this->minB  = 0.0;
+    this->my_rank = my_rank;
 }
 
 void VariationalLoop::run() {
@@ -24,46 +26,32 @@ void VariationalLoop::run() {
     vec    alphaBeta     = zeros<vec>(2);
 
 
+    alphaBeta(0) = 3.725; //initial alpha
+    alphaBeta(1) = 0.2455; //initial beta
 
 
-    alphaBeta(0) = 3.67;
-    alphaBeta(1) = 0.2;
 
 
-    for (int i = 1; i < 20000; i++) {
-        startClock = clock();
+
+
+    for (int i = 1; i < 2; i++) {
+         startClock = clock();
+
 
         // Run one metropolis loop.
-        energyVarGrad = m.runMetropolis(alphaBeta(0), alphaBeta(1));
+        energyVarGrad = m.runMetropolis(alphaBeta(0), alphaBeta(1), my_rank);
 
+        //data from Metropolis sampling
         energy        = energyVarGrad(0);
         varGrad(0)    = energyVarGrad(1);
         varGrad(1)    = energyVarGrad(2);
-
-
-        // Compute new values of alpha / beta.
-        //alphaBeta     -= (1/((double) i)) * 0.1 * varGrad * energy;
-
-
-        //    for (int k = 0; k < N; k++) {
-        //        for (int j = 0; j < N; j++) {
-        //            startClock = clock();
-        //            b = start + ((end-start)/N) * k;
-        //            a = start + ((end-start)/N) * j;
-        //            b = 0.6;
-        //            a = 3.6;
-
-        //        //alphaBeta(1) -=  (1/((double) i)) * 0.01 * varGrad(1) * energy;
-
-
         accepted      = energyVarGrad(3);
 
         if (accepted > 0.95) {
             // Compute new values of alpha / beta.
-            alphaBeta     += (1/((double) 15*i + 100)) * varGrad * energy;
-            //alphaBeta(0)   = 3.7;
-            //alphaBeta(1) = alphaBeta(1) + 1/((double) i + 10) * varGrad(1) * energy;
-        } else {
+            alphaBeta     += (1/((double) i)) * varGrad * energy / 1;
+
+        } else {//if acceptance rate is too low, usually means bad results, we disregard this data, since this tends to make the method unstable
             cout << "\n\n\n\n\n\naccepted  = "<< accepted << " < 0.95 \n\n\n\n\n";
         }
 
@@ -97,8 +85,8 @@ void VariationalLoop::run() {
         cout << "   * Alpha            = " << alphaBeta(0) << endl;
         cout << "   * Beta             = " << alphaBeta(1) << endl;
         cout << "VarGrad=" << varGrad << endl;
-        cout << "delta alphaBeta =" << (1/((double) i + 100)) * varGrad * energy << endl;
-        cout << "   * i                = " << i << endl;
+        //cout << "delta alphaBeta =" << (1/((double) i + 100)) * varGrad * energy << endl;
+        //cout << "   * i                = " << i << endl;
         cout << endl << endl;
     }
 

@@ -2,7 +2,7 @@
 #define VARIATIONALMC_H
 
 #include <armadillo>
-#include "wavefunctions.h"
+
 
 using namespace std;
 using namespace arma;
@@ -27,7 +27,7 @@ class VariationalMC {
         double  dt;
         vec     dx;
         mat     spins;
-        WaveFunctions waveFunc;
+        bool    isMolecule;
 
 
         double  computePsi(const mat&);
@@ -47,6 +47,9 @@ class VariationalMC {
         double  psi_s2_doubleDerivative(double);
         double  psi_s1_alphaDerivative(double r);
         double  psi_s2_alphaDerivative(double r);
+        double  psi_p2z_alphaDerivative(double r, const mat& coordinates, int i);
+        double  psi_p2x_alphaDerivative(double r, const mat& coordinates, int i);
+        double  psi_p2y_alphaDerivative(double r, const mat& coordinates, int i);
         double  computeSlaterRatio(const mat&, mat &, mat&, int, int p);
         double  slaterPsi(mat &R, mat &r, int i, int);
         double  psiDerivative(mat &R, mat&, int, int, int);
@@ -67,9 +70,9 @@ class VariationalMC {
         void    computeQuantumForce(mat &, mat &, mat &, mat &, mat &, double &);
         double  computeJastrowEnergy(const mat& , mat& , mat&);
         double  computeJastrowBetaDerivative(const mat&, const mat&);
-        double  slaterAlphaDerivative(int, double);
-        double  computeSlaterAlphaDerivative(const mat&, const mat&, const mat&);
-        void    updateVariationalGradient(mat&,mat&,const mat&,const mat&,const mat&, const mat&, double, mat&, mat&);
+        double  slaterAlphaDerivative(int, double, const mat coordinates, int);
+        double  computeSlaterAlphaDerivative(const mat&, const mat&, const mat&, const mat&);
+        void    updateVariationalGradient(mat&,mat&,const mat&,const mat&,const mat&, const mat&, double, mat&, mat&, mat&);
         void    updateVariationalGradientSum(mat&,mat&,const mat&,const mat&);
         double  psi_p2z(double distance, mat &r, int i);
         double  psi_p2y(double distance, mat &r, int i);
@@ -82,7 +85,7 @@ class VariationalMC {
         double  psi_p2x_doubleDerivative(double distance, mat &r, int i);
     public:
         VariationalMC();
-        vec runMetropolis(double, double);
+        vec runMetropolis(double, double, int);
 };
 
 #endif // VARIATIONALMC_H

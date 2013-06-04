@@ -1,7 +1,7 @@
 #ifndef VARIATIONALLOOP_H
 #define VARIATIONALLOOP_H
 #include "variationalmc.h"
-#include "varmc.h"
+
 
 class VariationalLoop {
     private:
@@ -18,11 +18,12 @@ class VariationalLoop {
         double  minB;
         double  a;
         double  b;
+        int     my_rank;
 
 
     public:
         VariationalLoop();
-        void initialize_helium();
+        void initialize_helium(int);
         void run();
 };
 

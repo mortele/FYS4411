@@ -4,27 +4,36 @@
 #include <cmath>
 #include <time.h>
 #include <armadillo>
+#include <mpi.h>
 
 #include "lib.h"
 #include "variationalmc.h"
 #include "variationalloop.h"
 
-//Old version of variationalmc.h, using numerical double derivatives.
-#include "varmc.h"
+
 
 using namespace std;
 using namespace arma;
 
 
-int main() {
+int main(int argc, char* argv[]) {
+    // Initialize MPI.
+    int my_rank, num_procs;
+    MPI_Status status;
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+
     VariationalLoop l;
 
     // Initialize relevant values for the Helium atom..
-    l.initialize_helium();
+    l.initialize_helium(my_rank);
 
     // Run a loop over variational parameters.
     l.run();
 
+    MPI_Finalize();
     return 0;
 }
 

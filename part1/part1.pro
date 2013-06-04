@@ -4,20 +4,12 @@ CONFIG -= app_bundle
 CONFIG -= qt
 
 SOURCES += main.cpp \
-    functions.cpp \
     variationalmc.cpp\
-    ../newfunctions.cpp \
-    varmc.cpp \
-    variationalloop.cpp \
-    wavefunctions.cpp \
-    H2molecule.cpp
+    variationalloop.cpp
 
 HEADERS += \
-    functions.h \
     variationalmc.h \
-    varmc.h \
-    variationalloop.h \
-    wavefunctions.h
+    variationalloop.h
 
 release {
     DEFINES += ARMA_NO_DEBUG
@@ -31,3 +23,15 @@ release {
     QMAKE_CXXFLAGS_RELEASE += -O3
 }
 LIBS+= -larmadillo -lblas -llapack
+
+# MPI Settings
+QMAKE_CXX = mpicxx
+QMAKE_CXX_RELEASE = $$QMAKE_CXX
+QMAKE_CXX_DEBUG = $$QMAKE_CXX
+QMAKE_LINK = $$QMAKE_CXX
+QMAKE_CC = mpicc
+
+QMAKE_CFLAGS += $$system(mpicc --showme:compile)
+QMAKE_LFLAGS += $$system(mpicxx --showme:link)
+QMAKE_CXXFLAGS += $$system(mpicxx --showme:compile) -DMPICH_IGNORE_CXX_SEEK
+QMAKE_CXXFLAGS_RELEASE += $$system(mpicxx --showme:compile) -DMPICH_IGNORE_CXX_SEEK
