@@ -14,9 +14,9 @@ using namespace arma;
 
 /* VMC constructor. */
 VariationalMC::VariationalMC() :
-    nParticles  (8),
+    nParticles  (2),
     nDimensions (3),
-    nCycles     (10000),
+    nCycles     (100000),
     N       (2 * nCycles / 10),
     idum    (time(0)),
     h       (0.00001),
@@ -25,8 +25,8 @@ VariationalMC::VariationalMC() :
     alph2   (alph * alph),
     beta    (1.0),
     MolecDist (4.63), //Be2 = 4.63, H2 = 1.4
-//        Z       (nParticles),
-    Z       (nParticles/2), //for molecules
+        Z       (nParticles),
+//    Z       (nParticles/2), //for molecules
     stepSize(0.1),
     D       (0.5),
     dt      (0.01), // 0.0007
@@ -47,10 +47,10 @@ vec VariationalMC::runMetropolis(double alpha, double beta, int my_rank) {
     mat correlationsNew = zeros<mat>(nParticles, nParticles);
     mat coordinatesNew  = zeros<mat>(nParticles, nDimensions);
     mat coordinatesOld  = zeros<mat>(nParticles, nDimensions);
-//    mat Rnew            = zeros<mat>(nParticles, nParticles);   // Matrix of distances and magnitudes.
-//    mat Rold            = zeros<mat>(nParticles, nParticles);
-    mat Rnew            = zeros<mat>(nParticles+1, nParticles);   // Matrix of distances and magnitudes. For molecules
-    mat Rold            = zeros<mat>(nParticles+1, nParticles);
+    mat Rnew            = zeros<mat>(nParticles, nParticles);   // Matrix of distances and magnitudes.
+    mat Rold            = zeros<mat>(nParticles, nParticles);
+//    mat Rnew            = zeros<mat>(nParticles+1, nParticles);   // Matrix of distances and magnitudes. For molecules
+//    mat Rold            = zeros<mat>(nParticles+1, nParticles);
     mat slaterOldUp     = zeros<mat>(nParticles/2, nParticles/2);
     mat slaterOldDown   = zeros<mat>(nParticles/2, nParticles/2);
     mat slaterNewUp     = zeros<mat>(nParticles/2, nParticles/2);
@@ -248,7 +248,7 @@ vec VariationalMC::runMetropolis(double alpha, double beta, int my_rank) {
     energyDown = computeKineticEnergyClosedForm(Rnew,coordinatesNew,slaterOldDown, 1);
     energyJas  = computeJastrowEnergy(Rnew, jastrowLaplacian, jastrowGradient);
     energyPot = computePotentialEnergyClosedForm(Rnew);
-    energy = energyUp + energyDown + energyPot + energyJas + energycrossterm;;
+    energy = energyUp + energyDown + energyPot + energyJas + energycrossterm;
 
 
 
@@ -296,11 +296,9 @@ vec VariationalMC::runMetropolis(double alpha, double beta, int my_rank) {
             computeSlaterGradient(Rnew, coordinatesNew,slaterOldUp, slaterGradient,Rsd, iRand);
         }
 
-        double nothing = 0; //just used once because "computeQuantumForce" needs to take in a double
         computeJastrowGradient(Rnew, jastrowGradient, iRand);
         computeJastrowLaplacian(Rnew, jastrowLaplacian, iRand);
         computeQuantumForce(quantumForceNew, Rnew, coordinatesNew, jastrowGradient, slaterGradient, energycrossterm);
-        computeQuantumForce(quantumForceOld, Rold, coordinatesOld, jastrowGradient, slaterGradientOld, nothing);
 
 
         // Compute the inside of the exponential term of the difference between Greens functions.
@@ -1109,185 +1107,18 @@ void VariationalMC::updateVariationalGradientSum(mat& varGradientSum,
  * MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT
  */
 
-// Choses which wave function to calculate from the int j, then calls the corresponding psi_j.  //FOR MOLECULES
-double VariationalMC::slaterPsi(mat &R, mat &r, int i, int j) {
-    double distance = R(i,i);
-    double distance2 = R(i+1,i);
-    if (j == 0) {
-        return psi_s1(distance) + psi_s1(distance2);
-    } else if (j == 1) {
-        return psi_s1(distance) - psi_s1(distance2);
-    } else if (j == 2) {
-        return psi_s2(distance) + psi_s2(distance2);
-    } else if (j == 3) {
-        return psi_s2(distance) - psi_s2(distance2);
-    } else if (j == 4) {
-        return psi_p2z(distance,r,i);
-    } else {
-        return 0;
-        cout << "Error in slaterPsi" << j<< endl;
-    }
-}
-
-
-// Alpha derivatives, MOLECULE EDITION.
-//
-double VariationalMC::slaterAlphaDerivative(int j, double r, const mat R, int i) {
-    double distance  = R(i,i);
-    double distance2 = R(i+1,i);
-    double R2 = MolecDist/2;
-
-    if (j == 0) {
-        return psi_s1_alphaDerivative(distance) + psi_s1_alphaDerivative(distance2);
-    } else if (j == 1) {
-        return psi_s1_alphaDerivative(distance) - psi_s1_alphaDerivative(distance2);
-    } else if (j == 2) {
-        return psi_s2_alphaDerivative(distance) + psi_s2_alphaDerivative(distance2);
-    } else if (j == 3) {
-        return psi_s2_alphaDerivative(distance) - psi_s2_alphaDerivative(distance2);
-    } else if (j == 4) {
-        cout << "Error in slaterAlphaDerivative" << j << endl;
-    } else {
-        cout << "Error in slaterAlphaDerivative" << j << endl;
-    }
-}
-
-
-double VariationalMC::psiDerivative(mat &R, mat &r, int i, int j, int k) {
-    double distance = R(i,i);
-    double distance2 = R(i+1,i);
-    double R2 = MolecDist/2;
-    if (k == 0) {
-        if (j==0)
-            return psi_s1_derivative(distance,r(i,j)-R2) + psi_s1_derivative(distance2,r(i,j)+R2);
-        else
-            return psi_s1_derivative(distance,r(i,j)) + psi_s1_derivative(distance2,r(i,j));
-
-    } else if (k == 1) {
-        if (j==0)
-            return psi_s1_derivative(distance,r(i,j)-R2) - psi_s1_derivative(distance2,r(i,j)+R2);
-        else
-            return psi_s1_derivative(distance,r(i,j)) - psi_s1_derivative(distance2,r(i,j));
-    } else if (k == 2) {
-        if (j==0)
-            return psi_s2_derivative(distance,r(i,j)-R2) + psi_s2_derivative(distance2,r(i,j)+R2);
-        else
-            return psi_s2_derivative(distance,r(i,j)) + psi_s2_derivative(distance2,r(i,j));
-    } else if (k == 3) {
-        if (j==0)
-            return psi_s2_derivative(distance,r(i,j)-R2) - psi_s2_derivative(distance2,r(i,j)+R2);
-        else
-            return psi_s2_derivative(distance,r(i,j)) - psi_s2_derivative(distance2,r(i,j));
-    } else {
-        return 0;
-        cout << "Error in psiDerivative: k = " << k  << endl;
-    }
-}
-
-double VariationalMC::psiDoubleDerivative(mat &R, mat &r, int i, int j) {
-    double distance = R(i,i);
-    double distance2 = R(i+1,i);
-    if (j == 0) {
-        return psi_s1_doubleDerivative(distance) + psi_s1_doubleDerivative(distance2);
-    } else if (j == 1) {
-        return psi_s1_doubleDerivative(distance) - psi_s1_doubleDerivative(distance2);
-    } else if (j == 2) {
-        return psi_s2_doubleDerivative(distance) + psi_s2_doubleDerivative(distance2);
-    } else if (j == 3) {
-        return psi_s2_doubleDerivative(distance) - psi_s2_doubleDerivative(distance2);
-    } else {
-        return 0;
-        cout << "Error in psiDoubleDerivative: j = " <<  j  << endl;
-    }
-}
-
-
-// Updates the distance matrix when we have just changed one coordinate of particle "i"
-// (like we do when computing the derivative)
-
-//version for calculating molecules
-void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
-    double dxx, sum;
-    double dist2 = MolecDist/2.0;
-    for(int k=0; k<i; k++) {
-        sum = 0;
-        for(int l =0;l<nDimensions;l++){
-            dxx = r(i,l) - r(k,l);
-            sum += dxx*dxx;
-        }
-        R(k,i) = sqrt(sum); //R is the matrix of distances
-    }
-
-    for(int k=i+1;k<nParticles;k++){
-        sum = 0;
-        for(int l =0;l<nDimensions;l++){
-            dxx = r(i,l) - r(k,l);;
-            sum += dxx*dxx;
-        }
-        R(i,k) = sqrt(sum); //R is the matrix of distances
-    }
-
-    sum = 0;
-    for(int l =0;l<nDimensions;l++){
-        dxx = r(i,l); //r[l+i*nDimensions]*r[l+i*nDimensions];
-        if (l==0) {
-            sum +=(dxx-dist2)*(dxx-dist2);
-        } else {
-            sum += dxx*dxx;
-        }
-    }
-    R(i,i) = sqrt(sum);
-    sum = 0;
-    for(int l =0;l<nDimensions;l++){
-        dxx = r(i,l); //r[l+i*nDimensions]*r[l+i*nDimensions];
-        if (l==0) {
-            sum +=(dxx+dist2)*(dxx+dist2);
-        } else {
-            sum += dxx*dxx;
-        }
-    }
-    R(i+1,i) = sqrt(sum);
-}
-
-
-double VariationalMC::computePotentialEnergyClosedForm(const mat& R) {
-    double returnVal = 0.0;
-    double E1 = 0.0;
-    returnVal = Z*Z/MolecDist;
-    // Compute the commutative part of H.
-    for(int i = 0; i < nParticles; i++) {
-        returnVal -= Z/R(i,i);
-        returnVal -= Z/R(i+1,i);
-
-        for(int j = i+1; j<nParticles; j++) {
-            E1 += 1/R(i,j);
-        }
-    }
-
-    return returnVal + E1;
-}
-
-
-/*
- * ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
- * ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
-* ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
-* ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
-* ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
-* ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
-*/
-
-//// Choses which wave function to calculate from the int j, then calls the corresponding psi_j. */
+//// Choses which wave function to calculate from the int j, then calls the corresponding psi_j.  //FOR MOLECULES
 //double VariationalMC::slaterPsi(mat &R, mat &r, int i, int j) {
 //    double distance = R(i,i);
+//    double distance2 = R(i+1,i);
 //    if (j == 0) {
-//        return psi_s1(distance);
+//        return psi_s1(distance) + psi_s1(distance2);
 //    } else if (j == 1) {
-//        return psi_s2(distance);
+//        return psi_s1(distance) - psi_s1(distance2);
 //    } else if (j == 2) {
-//        return psi_p2x(distance,r,i);
+//        return psi_s2(distance) + psi_s2(distance2);
 //    } else if (j == 3) {
-//        return psi_p2y(distance,r,i);
+//        return psi_s2(distance) - psi_s2(distance2);
 //    } else if (j == 4) {
 //        return psi_p2z(distance,r,i);
 //    } else {
@@ -1297,39 +1128,54 @@ double VariationalMC::computePotentialEnergyClosedForm(const mat& R) {
 //}
 
 
-//// Choses which wave function to calculate the alpha derivative of from the int
-//// j, then calls the corresponding psi_alphaDerivative.
+//// Alpha derivatives, MOLECULE EDITION.
 ////
-//double VariationalMC::slaterAlphaDerivative(int j, double r, const mat coordinates, int i) {
+//double VariationalMC::slaterAlphaDerivative(int j, double r, const mat R, int i) {
+//    double distance  = R(i,i);
+//    double distance2 = R(i+1,i);
+//    double R2 = MolecDist/2;
+
 //    if (j == 0) {
-//        return psi_s1_alphaDerivative(r);
+//        return psi_s1_alphaDerivative(distance) + psi_s1_alphaDerivative(distance2);
 //    } else if (j == 1) {
-//        return psi_s2_alphaDerivative(r);
+//        return psi_s1_alphaDerivative(distance) - psi_s1_alphaDerivative(distance2);
 //    } else if (j == 2) {
-//        return psi_p2x_alphaDerivative(r,coordinates,i);
+//        return psi_s2_alphaDerivative(distance) + psi_s2_alphaDerivative(distance2);
 //    } else if (j == 3) {
-//        return psi_p2y_alphaDerivative(r,coordinates,i);
+//        return psi_s2_alphaDerivative(distance) - psi_s2_alphaDerivative(distance2);
 //    } else if (j == 4) {
-//        return psi_p2z_alphaDerivative(r,coordinates,i);
+//        cout << "Error in slaterAlphaDerivative" << j << endl;
 //    } else {
 //        cout << "Error in slaterAlphaDerivative" << j << endl;
 //    }
 //}
 
+
 //double VariationalMC::psiDerivative(mat &R, mat &r, int i, int j, int k) {
 //    double distance = R(i,i);
+//    double distance2 = R(i+1,i);
+//    double R2 = MolecDist/2;
 //    if (k == 0) {
-
-//        return psi_s1_derivative(distance,r(i,j));
+//        if (j==0)
+//            return psi_s1_derivative(distance,r(i,j)-R2) + psi_s1_derivative(distance2,r(i,j)+R2);
+//        else
+//            return psi_s1_derivative(distance,r(i,j)) + psi_s1_derivative(distance2,r(i,j));
 
 //    } else if (k == 1) {
-//        return psi_s2_derivative(distance,r(i,j));
+//        if (j==0)
+//            return psi_s1_derivative(distance,r(i,j)-R2) - psi_s1_derivative(distance2,r(i,j)+R2);
+//        else
+//            return psi_s1_derivative(distance,r(i,j)) - psi_s1_derivative(distance2,r(i,j));
 //    } else if (k == 2) {
-//        return psi_p2x_derivative(distance,r,i,j);
+//        if (j==0)
+//            return psi_s2_derivative(distance,r(i,j)-R2) + psi_s2_derivative(distance2,r(i,j)+R2);
+//        else
+//            return psi_s2_derivative(distance,r(i,j)) + psi_s2_derivative(distance2,r(i,j));
 //    } else if (k == 3) {
-//        return psi_p2y_derivative(distance,r,i,j);
-//    } else if (k == 4) {
-//        return psi_p2z_derivative(distance,r,i,j);
+//        if (j==0)
+//            return psi_s2_derivative(distance,r(i,j)-R2) - psi_s2_derivative(distance2,r(i,j)+R2);
+//        else
+//            return psi_s2_derivative(distance,r(i,j)) - psi_s2_derivative(distance2,r(i,j));
 //    } else {
 //        return 0;
 //        cout << "Error in psiDerivative: k = " << k  << endl;
@@ -1338,17 +1184,15 @@ double VariationalMC::computePotentialEnergyClosedForm(const mat& R) {
 
 //double VariationalMC::psiDoubleDerivative(mat &R, mat &r, int i, int j) {
 //    double distance = R(i,i);
-
+//    double distance2 = R(i+1,i);
 //    if (j == 0) {
-//        return psi_s1_doubleDerivative(distance);
+//        return psi_s1_doubleDerivative(distance) + psi_s1_doubleDerivative(distance2);
 //    } else if (j == 1) {
-//        return psi_s2_doubleDerivative(distance);
+//        return psi_s1_doubleDerivative(distance) - psi_s1_doubleDerivative(distance2);
 //    } else if (j == 2) {
-//        return psi_p2x_doubleDerivative(distance,r,i);
+//        return psi_s2_doubleDerivative(distance) + psi_s2_doubleDerivative(distance2);
 //    } else if (j == 3) {
-//        return psi_p2y_doubleDerivative(distance,r,i);
-//    } else if (j == 4) {
-//        return psi_p2z_doubleDerivative(distance,r,i);
+//        return psi_s2_doubleDerivative(distance) - psi_s2_doubleDerivative(distance2);
 //    } else {
 //        return 0;
 //        cout << "Error in psiDoubleDerivative: j = " <<  j  << endl;
@@ -1357,10 +1201,12 @@ double VariationalMC::computePotentialEnergyClosedForm(const mat& R) {
 
 
 //// Updates the distance matrix when we have just changed one coordinate of particle "i"
-//// (like we do when computing the derivative)*/
-//void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
+//// (like we do when computing the derivative)
 
+////version for calculating molecules
+//void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
 //    double dxx, sum;
+//    double dist2 = MolecDist/2.0;
 //    for(int k=0; k<i; k++) {
 //        sum = 0;
 //        for(int l =0;l<nDimensions;l++){
@@ -1382,17 +1228,34 @@ double VariationalMC::computePotentialEnergyClosedForm(const mat& R) {
 //    sum = 0;
 //    for(int l =0;l<nDimensions;l++){
 //        dxx = r(i,l); //r[l+i*nDimensions]*r[l+i*nDimensions];
-//        sum += dxx*dxx;
+//        if (l==0) {
+//            sum +=(dxx-dist2)*(dxx-dist2);
+//        } else {
+//            sum += dxx*dxx;
+//        }
 //    }
 //    R(i,i) = sqrt(sum);
+//    sum = 0;
+//    for(int l =0;l<nDimensions;l++){
+//        dxx = r(i,l); //r[l+i*nDimensions]*r[l+i*nDimensions];
+//        if (l==0) {
+//            sum +=(dxx+dist2)*(dxx+dist2);
+//        } else {
+//            sum += dxx*dxx;
+//        }
+//    }
+//    R(i+1,i) = sqrt(sum);
 //}
+
 
 //double VariationalMC::computePotentialEnergyClosedForm(const mat& R) {
 //    double returnVal = 0.0;
 //    double E1 = 0.0;
+//    returnVal = Z*Z/MolecDist;
 //    // Compute the commutative part of H.
 //    for(int i = 0; i < nParticles; i++) {
 //        returnVal -= Z/R(i,i);
+//        returnVal -= Z/R(i+1,i);
 
 //        for(int j = i+1; j<nParticles; j++) {
 //            E1 += 1/R(i,j);
@@ -1401,3 +1264,138 @@ double VariationalMC::computePotentialEnergyClosedForm(const mat& R) {
 
 //    return returnVal + E1;
 //}
+
+
+/*
+ * ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
+ * ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
+* ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
+* ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
+* ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
+* ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
+*/
+
+// Choses which wave function to calculate from the int j, then calls the corresponding psi_j. */
+double VariationalMC::slaterPsi(mat &R, mat &r, int i, int j) {
+    double distance = R(i,i);
+    if (j == 0) {
+        return psi_s1(distance);
+    } else if (j == 1) {
+        return psi_s2(distance);
+    } else if (j == 2) {
+        return psi_p2x(distance,r,i);
+    } else if (j == 3) {
+        return psi_p2y(distance,r,i);
+    } else if (j == 4) {
+        return psi_p2z(distance,r,i);
+    } else {
+        return 0;
+        cout << "Error in slaterPsi" << j<< endl;
+    }
+}
+
+
+// Choses which wave function to calculate the alpha derivative of from the int
+// j, then calls the corresponding psi_alphaDerivative.
+//
+double VariationalMC::slaterAlphaDerivative(int j, double r, const mat coordinates, int i) {
+    if (j == 0) {
+        return psi_s1_alphaDerivative(r);
+    } else if (j == 1) {
+        return psi_s2_alphaDerivative(r);
+    } else if (j == 2) {
+        return psi_p2x_alphaDerivative(r,coordinates,i);
+    } else if (j == 3) {
+        return psi_p2y_alphaDerivative(r,coordinates,i);
+    } else if (j == 4) {
+        return psi_p2z_alphaDerivative(r,coordinates,i);
+    } else {
+        cout << "Error in slaterAlphaDerivative" << j << endl;
+    }
+}
+
+double VariationalMC::psiDerivative(mat &R, mat &r, int i, int j, int k) {
+    double distance = R(i,i);
+    if (k == 0) {
+
+        return psi_s1_derivative(distance,r(i,j));
+
+    } else if (k == 1) {
+        return psi_s2_derivative(distance,r(i,j));
+    } else if (k == 2) {
+        return psi_p2x_derivative(distance,r,i,j);
+    } else if (k == 3) {
+        return psi_p2y_derivative(distance,r,i,j);
+    } else if (k == 4) {
+        return psi_p2z_derivative(distance,r,i,j);
+    } else {
+        return 0;
+        cout << "Error in psiDerivative: k = " << k  << endl;
+    }
+}
+
+double VariationalMC::psiDoubleDerivative(mat &R, mat &r, int i, int j) {
+    double distance = R(i,i);
+
+    if (j == 0) {
+        return psi_s1_doubleDerivative(distance);
+    } else if (j == 1) {
+        return psi_s2_doubleDerivative(distance);
+    } else if (j == 2) {
+        return psi_p2x_doubleDerivative(distance,r,i);
+    } else if (j == 3) {
+        return psi_p2y_doubleDerivative(distance,r,i);
+    } else if (j == 4) {
+        return psi_p2z_doubleDerivative(distance,r,i);
+    } else {
+        return 0;
+        cout << "Error in psiDoubleDerivative: j = " <<  j  << endl;
+    }
+}
+
+
+// Updates the distance matrix when we have just changed one coordinate of particle "i"
+// (like we do when computing the derivative)*/
+void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
+
+    double dxx, sum;
+    for(int k=0; k<i; k++) {
+        sum = 0;
+        for(int l =0;l<nDimensions;l++){
+            dxx = r(i,l) - r(k,l);
+            sum += dxx*dxx;
+        }
+        R(k,i) = sqrt(sum); //R is the matrix of distances
+    }
+
+    for(int k=i+1;k<nParticles;k++){
+        sum = 0;
+        for(int l =0;l<nDimensions;l++){
+            dxx = r(i,l) - r(k,l);;
+            sum += dxx*dxx;
+        }
+        R(i,k) = sqrt(sum); //R is the matrix of distances
+    }
+
+    sum = 0;
+    for(int l =0;l<nDimensions;l++){
+        dxx = r(i,l); //r[l+i*nDimensions]*r[l+i*nDimensions];
+        sum += dxx*dxx;
+    }
+    R(i,i) = sqrt(sum);
+}
+
+double VariationalMC::computePotentialEnergyClosedForm(const mat& R) {
+    double returnVal = 0.0;
+    double E1 = 0.0;
+    // Compute the commutative part of H.
+    for(int i = 0; i < nParticles; i++) {
+        returnVal -= Z/R(i,i);
+
+        for(int j = i+1; j<nParticles; j++) {
+            E1 += 1/R(i,j);
+        }
+    }
+
+    return returnVal + E1;
+}

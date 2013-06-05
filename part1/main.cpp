@@ -27,8 +27,8 @@ int main(int argc, char* argv[]) {
 
     VariationalLoop l;
 
-    // Initialize relevant values for the Helium atom..
-    l.initialize_helium(my_rank);
+    // Initialize processes
+    l.initialize_processes(my_rank);
 
     // Run a loop over variational parameters.
     l.run();
