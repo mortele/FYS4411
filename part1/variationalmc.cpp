@@ -8,6 +8,7 @@
 #include "variationalmc.h"
 #include "lib.cpp"
 
+//hei
 
 using namespace std;
 using namespace arma;
