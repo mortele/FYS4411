@@ -5,7 +5,8 @@ CONFIG -= qt
 
 SOURCES += main.cpp \
     variationalmc.cpp\
-    variationalloop.cpp
+    variationalloop.cpp \
+    ../../../../Comp/Project 2/jacobi.cpp
 
 HEADERS += \
     variationalmc.h \
