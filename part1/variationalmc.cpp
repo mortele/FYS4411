@@ -17,7 +17,7 @@ using namespace arma;
 VariationalMC::VariationalMC() :
     nParticles  (2),
     nDimensions (3),
-    nCycles     (100000),
+    nCycles     ((int) 5e6), //5000000
     N       (2 * nCycles / 10),
     idum    (time(0)),
     h       (0.00001),
@@ -25,9 +25,9 @@ VariationalMC::VariationalMC() :
     alph    (1.0),
     alph2   (alph * alph),
     beta    (1.0),
-    MolecDist (4.63), //Be2 = 4.63, H2 = 1.4
-        Z       (nParticles),
-//    Z       (nParticles/2), //for molecules
+    MolecDist (1.4), //Be2 = 4.63, H2 = 1.4
+    //Z       (nParticles),
+    Z       (nParticles/2), //for molecules
     stepSize(0.1),
     D       (0.5),
     dt      (0.01), // 0.0007
@@ -36,39 +36,71 @@ VariationalMC::VariationalMC() :
     isMolecule(true) {
 }
 
+void VariationalMC::setMolecularDistance(double R) {
+    this->MolecDist = R;
+}
+
+void VariationalMC::setNumberOfMonteCarloCycles(int n) {
+    this->nCycles = n;
+}
 
 /* Runs the Metropolis algorithm nCycles times. */
-vec VariationalMC::runMetropolis(double alpha, double beta, int my_rank) {
-    this->idum += my_rank*my_rank*my_rank;
+vec VariationalMC::runMetropolis(double alpha, double beta) {
+    //this->idum += 0;
     this->alph  = alpha;
     this->alph2 = alph * alph;
     this->beta  = beta;
 
-    mat correlationsOld = zeros<mat>(nParticles, nParticles);
-    mat correlationsNew = zeros<mat>(nParticles, nParticles);
-    mat coordinatesNew  = zeros<mat>(nParticles, nDimensions);
-    mat coordinatesOld  = zeros<mat>(nParticles, nDimensions);
-    mat Rnew            = zeros<mat>(nParticles, nParticles);   // Matrix of distances and magnitudes.
-    mat Rold            = zeros<mat>(nParticles, nParticles);
-//    mat Rnew            = zeros<mat>(nParticles+1, nParticles);   // Matrix of distances and magnitudes. For molecules
-//    mat Rold            = zeros<mat>(nParticles+1, nParticles);
-    mat slaterOldUp     = zeros<mat>(nParticles/2, nParticles/2);
-    mat slaterOldDown   = zeros<mat>(nParticles/2, nParticles/2);
-    mat slaterNewUp     = zeros<mat>(nParticles/2, nParticles/2);
-    mat slaterNewDown   = zeros<mat>(nParticles/2, nParticles/2);
-    mat slaterGradient  = zeros<mat>(nParticles, nDimensions);
-    mat slaterGradientOld   = zeros<mat>(nParticles, nDimensions);
-    mat jastrowGradient     = zeros<mat>(nParticles, nParticles);
-    mat jastrowGradientOld  = zeros<mat>(nParticles, nParticles);
-    mat jastrowLaplacian    = zeros<mat>(nParticles, nParticles);
-    mat jastrowLaplacianOld = zeros<mat>(nParticles, nParticles);
-    mat quantumForceOld     = zeros<mat>(nParticles, nDimensions);
-    mat quantumForceNew     = zeros<mat>(nParticles, nDimensions);
 
-    vec variationalGrad     = zeros<vec>(2);
-    vec variationalGradE    = zeros<vec>(2);
-    vec variationalGradSum  = zeros<vec>(2);
-    vec variationalGradESum = zeros<vec>(2);
+
+    if (this->firstSetup) {
+        this->firstSetup = false;
+
+        //    mat Rnew            = zeros<mat>(nParticles, nParticles);   // Matrix of distances and magnitudes.
+        //    mat Rold            = zeros<mat>(nParticles, nParticles);
+
+        this->correlationsOld = zeros<mat>(nParticles, nParticles);
+        this->correlationsNew = zeros<mat>(nParticles, nParticles);
+        this->coordinatesNew  = zeros<mat>(nParticles, nDimensions);
+        this->coordinatesOld  = zeros<mat>(nParticles, nDimensions);
+        this->Rnew            = zeros<mat>(nParticles+1, nParticles);   // Matrix of distances and magnitudes. For molecules
+        this->Rold            = zeros<mat>(nParticles+1, nParticles);
+        this->slaterOldUp     = zeros<mat>(nParticles/2, nParticles/2);
+        this->slaterOldDown   = zeros<mat>(nParticles/2, nParticles/2);
+        this->slaterNewUp     = zeros<mat>(nParticles/2, nParticles/2);
+        this->slaterNewDown   = zeros<mat>(nParticles/2, nParticles/2);
+        this->slaterGradient  = zeros<mat>(nParticles, nDimensions);
+        this->slaterGradientOld   = zeros<mat>(nParticles, nDimensions);
+        this->jastrowGradient     = zeros<mat>(nParticles, nParticles);
+        this->jastrowGradientOld  = zeros<mat>(nParticles, nParticles);
+        this->jastrowLaplacian    = zeros<mat>(nParticles, nParticles);
+        this->jastrowLaplacianOld = zeros<mat>(nParticles, nParticles);
+        this->quantumForceOld     = zeros<mat>(nParticles, nDimensions);
+        this->quantumForceNew     = zeros<mat>(nParticles, nDimensions);
+        this->variationalGrad     = zeros<vec>(2);
+        this->variationalGradE    = zeros<vec>(2);
+        this->variationalGradSum  = zeros<vec>(2);
+        this->variationalGradESum = zeros<vec>(2);
+
+        //  -1.5037  -1.2662   0.3342
+        //   0.2958   0.9744   0.6983
+        // Fill coordinates matrix with random values.
+        coordinatesNew(0,0) = -1.5037;
+        coordinatesNew(0,1) = -1.2662;
+        coordinatesNew(0,2) = 0.3342;
+
+        coordinatesNew(1,0) = 0.2958;
+        coordinatesNew(1,1) = 0.9744;
+        coordinatesNew(1,2) = 0.6983;
+
+        for (int i = 0; i < nParticles; i++) {
+            for (int j = 0; j < nDimensions; j++) {
+                //coordinatesNew(i,j) = gaussian_deviate(&idum) * 5.0 / (sqrt(alph));
+                coordinatesOld(i,j) = coordinatesNew(i,j);
+            }
+        }
+    }
+    //cout << "start:" << endl << coordinatesNew << endl;
 
     double ecoeff          = 0.0;
     double Rsd             = 0.0;
@@ -107,78 +139,73 @@ vec VariationalMC::runMetropolis(double alpha, double beta, int my_rank) {
     //Code for writing data to file //Code for writing data to file
     //Code for writing data to file //Code for writing data to file
     // Make sure each process writes to a separate file.
-    ofstream outFile;
-    ofstream outFileX1, outFileY1;
-    ofstream outFileX2, outFileY2;
-    ofstream outFileX3, outFileY3;
-    ofstream outFileX4, outFileY4;
-    ofstream outFileX5, outFileY5;
-    ofstream outFileX6, outFileY6;
-    ofstream outFileX7, outFileY7;
-    ofstream outFileX8, outFileY8;
-    ofstream outFileX9, outFileY9;
-    ofstream outFileX10, outFileY10;
+    //    ofstream outFile;
+    //    ofstream outFileX1, outFileY1;
+    //    ofstream outFileX2, outFileY2;
+    //    ofstream outFileX3, outFileY3;
+    //    ofstream outFileX4, outFileY4;
+    //    ofstream outFileX5, outFileY5;
+    //    ofstream outFileX6, outFileY6;
+    //    ofstream outFileX7, outFileY7;
+    //    ofstream outFileX8, outFileY8;
+    //    ofstream outFileX9, outFileY9;
+    //    ofstream outFileX10, outFileY10;
 
-    stringstream strs;
-    strs << my_rank+500;
-    string temp_str = strs.str();
-    char* pchar = (char*) temp_str.c_str();
-
-    // Filename 100+my_rank == He.
-    // Filename 200+my_rank == Be.
-    // Filename 300+my_rank == Ne.
-    // Filename 400+my_rank == H_2.
-    // Filename 500+my_rank == Be_2.
-
-    char* fileName = "binaryData";
-    fileName = pchar;
-
-    cout << fileName << endl;
-    outFile.open(fileName, ios::binary);
-
-    outFileX1.open("x0.bin", ios::binary);
-    outFileX2.open("x1.bin", ios::binary);
-    outFileX3.open("x2.bin", ios::binary);
-    outFileX4.open("x3.bin", ios::binary);
-    outFileX5.open("x4.bin", ios::binary);
-    outFileX6.open("x5.bin", ios::binary);
-    outFileX7.open("x6.bin", ios::binary);
-    outFileX8.open("x7.bin", ios::binary);
-    outFileX9.open("x8.bin", ios::binary);
-    outFileX10.open("x9.bin", ios::binary);
-
-
-    outFileY1.open("y0.bin", ios::binary);
-    outFileY2.open("y1.bin", ios::binary);
-    outFileY3.open("y2.bin", ios::binary);
-    outFileY4.open("y3.bin", ios::binary);
-    outFileY5.open("y4.bin", ios::binary);
-    outFileY6.open("y5.bin", ios::binary);
-    outFileY7.open("y6.bin", ios::binary);
-    outFileY8.open("y7.bin", ios::binary);
-    outFileY9.open("y8.bin", ios::binary);
-    outFileY10.open("y9.bin", ios::binary);
-
-
+    //   stringstream strs;
+    //   strs << my_rank+500;
+    //   string temp_str = strs.str();
+    //   char* pchar = (char*) temp_str.c_str();
+    //
+    //   // Filename 100+my_rank == He.
+    //   // Filename 200+my_rank == Be.
+    //   // Filename 300+my_rank == Ne.
+    //   // Filename 400+my_rank == H_2.
+    //   // Filename 500+my_rank == Be_2.
+    //
+    //   char* fileName = "binaryData";
+    //   fileName = pchar;
+    //
+    //
+    //   outFile.open(fileName, ios::binary);
+    //
+    //   outFileX1.open("x0.bin", ios::binary);
+    //   outFileX2.open("x1.bin", ios::binary);
+    //   outFileX3.open("x2.bin", ios::binary);
+    //   outFileX4.open("x3.bin", ios::binary);
+    //   outFileX5.open("x4.bin", ios::binary);
+    //   outFileX6.open("x5.bin", ios::binary);
+    //   outFileX7.open("x6.bin", ios::binary);
+    //   outFileX8.open("x7.bin", ios::binary);
+    //   outFileX9.open("x8.bin", ios::binary);
+    //   outFileX10.open("x9.bin", ios::binary);
+    //
+    //
+    //   outFileY1.open("y0.bin", ios::binary);
+    //   outFileY2.open("y1.bin", ios::binary);
+    //   outFileY3.open("y2.bin", ios::binary);
+    //   outFileY4.open("y3.bin", ios::binary);
+    //   outFileY5.open("y4.bin", ios::binary);
+    //   outFileY6.open("y5.bin", ios::binary);
+    //   outFileY7.open("y6.bin", ios::binary);
+    //   outFileY8.open("y7.bin", ios::binary);
+    //   outFileY9.open("y8.bin", ios::binary);
+    //   outFileY10.open("y9.bin", ios::binary);
 
 
 
-        //               preparations for metropolis sampling
-        //               preparations for metropolis sampling
-        //               preparations for metropolis sampling
-        //               preparations for metropolis sampling
+
+
+    //               preparations for metropolis sampling
+    //               preparations for metropolis sampling
+    //               preparations for metropolis sampling
+    //               preparations for metropolis sampling
 
 
     // Fills the spin matrix with relevant values for <some atom>.
     fillSpinMatrix(this->spins);
 
-    // Fill coordinates matrix with random values.
-    for (int i = 0; i < nParticles; i++) {
-        for (int j = 0; j < nDimensions; j++) {
-            coordinatesNew(i,j) = gaussian_deviate(&idum) * 5.0 / (sqrt(alph));
-            coordinatesOld(i,j) = coordinatesNew(i,j);
-        }
-    }
+
+
 
     //    // Updates distances and magnitudes in this initial state.
     //    updateRmatrix(coordinatesNew, Rnew);
@@ -261,12 +288,12 @@ vec VariationalMC::runMetropolis(double alpha, double beta, int my_rank) {
 
 
 
-                                // Metropolis loop.
-                                // Metropolis loop.
-                                // Metropolis loop.
-                                // Metropolis loop.
-                                // Metropolis loop.
-                                // Metropolis loop.
+    // Metropolis loop.
+    // Metropolis loop.
+    // Metropolis loop.
+    // Metropolis loop.
+    // Metropolis loop.
+    // Metropolis loop.
 
     for (int k = 0; k < nCycles; k++) {
 
@@ -277,7 +304,7 @@ vec VariationalMC::runMetropolis(double alpha, double beta, int my_rank) {
         for (int j = 0; j < nDimensions; j++) {
             // Suggest new steps:
             coordinatesNew(iRand, j) += gaussian_deviate(&idum) * sqrt(dt) +
-                    quantumForceOld(iRand,j) * dt * D; // * 2 * D;
+                                        quantumForceOld(iRand,j) * dt * D; // * 2 * D;
         }
 
 
@@ -309,9 +336,9 @@ vec VariationalMC::runMetropolis(double alpha, double beta, int my_rank) {
             for (int j = 0; j < nDimensions; j++) {
                 greensFunction += 0.5* (quantumForceOld(i,j) +
                                         quantumForceNew(i,j)) *
-                        (D * dt * 0.5* (quantumForceOld(i,j) -
-                                        quantumForceNew(i,j)) -
-                         coordinatesNew(i,j) + coordinatesOld(i,j));
+                                  (D * dt * 0.5* (quantumForceOld(i,j) -
+                                                  quantumForceNew(i,j)) -
+                                   coordinatesNew(i,j) + coordinatesOld(i,j));
 
             }
         }
@@ -406,37 +433,37 @@ vec VariationalMC::runMetropolis(double alpha, double beta, int my_rank) {
 
         // Write data to file in binary format, for later analysis with blocking.
         if (k >= 0) {
-            outFile.write ((char*)  &energy, sizeof(double));
+            //outFile.write ((char*)  &energy, sizeof(double));
 
-//            outFileX1.write((char*) &coordinatesNew(0,0), sizeof(double));
-//            outFileY1.write((char*) &coordinatesNew(0,1), sizeof(double));
+            //            outFileX1.write((char*) &coordinatesNew(0,0), sizeof(double));
+            //            outFileY1.write((char*) &coordinatesNew(0,1), sizeof(double));
 
-//            outFileX2.write((char*) &coordinatesNew(1,0), sizeof(double));
-//            outFileY2.write((char*) &coordinatesNew(1,1), sizeof(double));
+            //            outFileX2.write((char*) &coordinatesNew(1,0), sizeof(double));
+            //            outFileY2.write((char*) &coordinatesNew(1,1), sizeof(double));
 
-//            outFileX3.write((char*) &coordinatesNew(0,2), sizeof(double));  // Z-COORDINATE!!!
-//            outFileY3.write((char*) &coordinatesNew(1,2), sizeof(double));  // Z-COORDINATE!!!
+            //            outFileX3.write((char*) &coordinatesNew(0,2), sizeof(double));  // Z-COORDINATE!!!
+            //            outFileY3.write((char*) &coordinatesNew(1,2), sizeof(double));  // Z-COORDINATE!!!
 
-//            outFileX4.write((char*) &coordinatesNew(3,0), sizeof(double));
-//            outFileY4.write((char*) &coordinatesNew(3,1), sizeof(double));
+            //            outFileX4.write((char*) &coordinatesNew(3,0), sizeof(double));
+            //            outFileY4.write((char*) &coordinatesNew(3,1), sizeof(double));
 
-//            outFileX5.write((char*) &coordinatesNew(4,0), sizeof(double));
-//            outFileY5.write((char*) &coordinatesNew(4,1), sizeof(double));
+            //            outFileX5.write((char*) &coordinatesNew(4,0), sizeof(double));
+            //            outFileY5.write((char*) &coordinatesNew(4,1), sizeof(double));
 
-//            outFileX6.write((char*) &coordinatesNew(5,0), sizeof(double));
-//            outFileY6.write((char*) &coordinatesNew(5,1), sizeof(double));
+            //            outFileX6.write((char*) &coordinatesNew(5,0), sizeof(double));
+            //            outFileY6.write((char*) &coordinatesNew(5,1), sizeof(double));
 
-//            outFileX7.write((char*) &coordinatesNew(6,0), sizeof(double));
-//            outFileY7.write((char*) &coordinatesNew(6,1), sizeof(double));
+            //            outFileX7.write((char*) &coordinatesNew(6,0), sizeof(double));
+            //            outFileY7.write((char*) &coordinatesNew(6,1), sizeof(double));
 
-//            outFileX8.write((char*) &coordinatesNew(7,0), sizeof(double));
-//            outFileY8.write((char*) &coordinatesNew(7,1), sizeof(double));
+            //            outFileX8.write((char*) &coordinatesNew(7,0), sizeof(double));
+            //            outFileY8.write((char*) &coordinatesNew(7,1), sizeof(double));
 
-//            outFileX9.write((char*) &coordinatesNew(8,0), sizeof(double));
-//            outFileY9.write((char*) &coordinatesNew(8,1), sizeof(double));
+            //            outFileX9.write((char*) &coordinatesNew(8,0), sizeof(double));
+            //            outFileY9.write((char*) &coordinatesNew(8,1), sizeof(double));
 
-//            outFileX10.write((char*) &coordinatesNew(9,0), sizeof(double));
-//            outFileY10.write((char*) &coordinatesNew(9,1), sizeof(double));
+            //            outFileX10.write((char*) &coordinatesNew(9,0), sizeof(double));
+            //            outFileY10.write((char*) &coordinatesNew(9,1), sizeof(double));
         }
     }
 
@@ -446,60 +473,66 @@ vec VariationalMC::runMetropolis(double alpha, double beta, int my_rank) {
 
 
 
-     //Metropolis loop done!
-     //Metropolis loop done!
-     //Metropolis loop done!
-     //Metropolis loop done!
-     //Metropolis loop done!
-     //Metropolis loop done!
+    //Metropolis loop done!
+    //Metropolis loop done!
+    //Metropolis loop done!
+    //Metropolis loop done!
+    //Metropolis loop done!
+    //Metropolis loop done!
 
-    outFileX1.close();
-    outFileX2.close();
-    outFileX3.close();
-    outFileX4.close();
-    outFileX5.close();
-    outFileX6.close();
-    outFileX7.close();
-    outFileX8.close();
-    outFileX9.close();
-    outFileX10.close();
-
-    outFileY1.close();
-    outFileY2.close();
-    outFileY3.close();
-    outFileY4.close();
-    outFileY5.close();
-    outFileY6.close();
-    outFileY7.close();
-    outFileY8.close();
-    outFileY9.close();
-    outFileY10.close();
+    //    outFileX1.close();
+    //    outFileX2.close();
+    //    outFileX3.close();
+    //    outFileX4.close();
+    //    outFileX5.close();
+    //    outFileX6.close();
+    //    outFileX7.close();
+    //    outFileX8.close();
+    //    outFileX9.close();
+    //    outFileX10.close();
+    //
+    //    outFileY1.close();
+    //    outFileY2.close();
+    //    outFileY3.close();
+    //    outFileY4.close();
+    //    outFileY5.close();
+    //    outFileY6.close();
+    //    outFileY7.close();
+    //    outFileY8.close();
+    //    outFileY9.close();
+    //    outFileY10.close();
 
 
     // Calculate the expected value of the energy, the energy squared, and the variance.
     energy  = energySum  / ((double) (nCycles - N-1));
     energy2 = energy2Sum / ((double) (nCycles - N-1));
 
-    outFile.write ((char*)  &energy, sizeof(double));
-    outFile.close();
+    //    outFile.write ((char*)  &energy, sizeof(double));
+    //    outFile.close();
 
     variationalGradSum  /= ((double) (nCycles - N-1));
     variationalGradESum /= ((double) (nCycles - N-1));
 
     variationalGrad = 2*(variationalGradESum - energy * variationalGradSum);
 
-    cout << "<E>  = " << setprecision(15) << energy << endl;
+    cout << "<E>=" << setprecision(5) << energy << ", alpha=" << alpha
+         << ", beta=" << beta << ", Var(E)=" << (energy2 - energy*energy)/((double) nCycles)
+         << ", accepted=" << ((double) accepted) / (nCycles - N-1) << endl;
+    /*cout << "<E>  = " << setprecision(15) << energy << endl;
     cout << "<E²> = " << setprecision(15) << energy2 << endl;
     cout << "Sample variance  = " << (energy2 - energy*energy)/((double) nCycles) << endl;
     cout << "Sample std. dev. = " << sqrt((energy2 - energy*energy)/sqrt(nCycles)) << endl;
     cout << "Accepted steps / total steps = " << ((double) accepted) / (nCycles - N-1) << endl;
-    cout << "Total steps, nCycles = " << nCycles << endl;
+    cout << "Total steps, nCycles = " << nCycles << endl;*/
 
     vec returnVec = zeros<vec>(4);
     returnVec(0) = energy;
     returnVec(1) = variationalGrad(0);
     returnVec(2) = variationalGrad(1);
     returnVec(3) = ((double) accepted) / (nCycles - N-1);
+
+    //cout << "end:" << endl << coordinatesNew << endl;
+
     return returnVec;
 }
 
@@ -513,6 +546,8 @@ vec VariationalMC::runMetropolis(double alpha, double beta, int my_rank) {
 
 /* Computes the local energy of a state defined by position matrix r, and distance matrix R.
  * EL = 1/psi * H * psi */
+
+
 double VariationalMC::computeEnergy(mat &R, mat &r, double psi) {
 
     double b1 = beta * R(0,1);
@@ -578,7 +613,7 @@ void VariationalMC::computeQuantumForce(mat & QuantumForce, mat &R, mat &r, mat 
             }
 
             QuantumForce(k,j) = 2*(slaterGradient(k,j) + sum);
-//                        QuantumForce(k,j) = 2*slaterGradient(k,j);   //used when we dont want the correlation
+            //                        QuantumForce(k,j) = 2*slaterGradient(k,j);   //used when we dont want the correlation
             energycrossterm  -=  sum*sum/2.0 + (slaterGradient(k,j) * sum); // computes part of the kinetic energy, since it is convenient to do it here
         }
     }
@@ -1108,185 +1143,18 @@ void VariationalMC::updateVariationalGradientSum(mat& varGradientSum,
  * MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT MOLECULE SHIT
  */
 
-//// Choses which wave function to calculate from the int j, then calls the corresponding psi_j.  //FOR MOLECULES
-//double VariationalMC::slaterPsi(mat &R, mat &r, int i, int j) {
-//    double distance = R(i,i);
-//    double distance2 = R(i+1,i);
-//    if (j == 0) {
-//        return psi_s1(distance) + psi_s1(distance2);
-//    } else if (j == 1) {
-//        return psi_s1(distance) - psi_s1(distance2);
-//    } else if (j == 2) {
-//        return psi_s2(distance) + psi_s2(distance2);
-//    } else if (j == 3) {
-//        return psi_s2(distance) - psi_s2(distance2);
-//    } else if (j == 4) {
-//        return psi_p2z(distance,r,i);
-//    } else {
-//        return 0;
-//        cout << "Error in slaterPsi" << j<< endl;
-//    }
-//}
-
-
-//// Alpha derivatives, MOLECULE EDITION.
-////
-//double VariationalMC::slaterAlphaDerivative(int j, double r, const mat R, int i) {
-//    double distance  = R(i,i);
-//    double distance2 = R(i+1,i);
-//    double R2 = MolecDist/2;
-
-//    if (j == 0) {
-//        return psi_s1_alphaDerivative(distance) + psi_s1_alphaDerivative(distance2);
-//    } else if (j == 1) {
-//        return psi_s1_alphaDerivative(distance) - psi_s1_alphaDerivative(distance2);
-//    } else if (j == 2) {
-//        return psi_s2_alphaDerivative(distance) + psi_s2_alphaDerivative(distance2);
-//    } else if (j == 3) {
-//        return psi_s2_alphaDerivative(distance) - psi_s2_alphaDerivative(distance2);
-//    } else if (j == 4) {
-//        cout << "Error in slaterAlphaDerivative" << j << endl;
-//    } else {
-//        cout << "Error in slaterAlphaDerivative" << j << endl;
-//    }
-//}
-
-
-//double VariationalMC::psiDerivative(mat &R, mat &r, int i, int j, int k) {
-//    double distance = R(i,i);
-//    double distance2 = R(i+1,i);
-//    double R2 = MolecDist/2;
-//    if (k == 0) {
-//        if (j==0)
-//            return psi_s1_derivative(distance,r(i,j)-R2) + psi_s1_derivative(distance2,r(i,j)+R2);
-//        else
-//            return psi_s1_derivative(distance,r(i,j)) + psi_s1_derivative(distance2,r(i,j));
-
-//    } else if (k == 1) {
-//        if (j==0)
-//            return psi_s1_derivative(distance,r(i,j)-R2) - psi_s1_derivative(distance2,r(i,j)+R2);
-//        else
-//            return psi_s1_derivative(distance,r(i,j)) - psi_s1_derivative(distance2,r(i,j));
-//    } else if (k == 2) {
-//        if (j==0)
-//            return psi_s2_derivative(distance,r(i,j)-R2) + psi_s2_derivative(distance2,r(i,j)+R2);
-//        else
-//            return psi_s2_derivative(distance,r(i,j)) + psi_s2_derivative(distance2,r(i,j));
-//    } else if (k == 3) {
-//        if (j==0)
-//            return psi_s2_derivative(distance,r(i,j)-R2) - psi_s2_derivative(distance2,r(i,j)+R2);
-//        else
-//            return psi_s2_derivative(distance,r(i,j)) - psi_s2_derivative(distance2,r(i,j));
-//    } else {
-//        return 0;
-//        cout << "Error in psiDerivative: k = " << k  << endl;
-//    }
-//}
-
-//double VariationalMC::psiDoubleDerivative(mat &R, mat &r, int i, int j) {
-//    double distance = R(i,i);
-//    double distance2 = R(i+1,i);
-//    if (j == 0) {
-//        return psi_s1_doubleDerivative(distance) + psi_s1_doubleDerivative(distance2);
-//    } else if (j == 1) {
-//        return psi_s1_doubleDerivative(distance) - psi_s1_doubleDerivative(distance2);
-//    } else if (j == 2) {
-//        return psi_s2_doubleDerivative(distance) + psi_s2_doubleDerivative(distance2);
-//    } else if (j == 3) {
-//        return psi_s2_doubleDerivative(distance) - psi_s2_doubleDerivative(distance2);
-//    } else {
-//        return 0;
-//        cout << "Error in psiDoubleDerivative: j = " <<  j  << endl;
-//    }
-//}
-
-
-//// Updates the distance matrix when we have just changed one coordinate of particle "i"
-//// (like we do when computing the derivative)
-
-////version for calculating molecules
-//void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
-//    double dxx, sum;
-//    double dist2 = MolecDist/2.0;
-//    for(int k=0; k<i; k++) {
-//        sum = 0;
-//        for(int l =0;l<nDimensions;l++){
-//            dxx = r(i,l) - r(k,l);
-//            sum += dxx*dxx;
-//        }
-//        R(k,i) = sqrt(sum); //R is the matrix of distances
-//    }
-
-//    for(int k=i+1;k<nParticles;k++){
-//        sum = 0;
-//        for(int l =0;l<nDimensions;l++){
-//            dxx = r(i,l) - r(k,l);;
-//            sum += dxx*dxx;
-//        }
-//        R(i,k) = sqrt(sum); //R is the matrix of distances
-//    }
-
-//    sum = 0;
-//    for(int l =0;l<nDimensions;l++){
-//        dxx = r(i,l); //r[l+i*nDimensions]*r[l+i*nDimensions];
-//        if (l==0) {
-//            sum +=(dxx-dist2)*(dxx-dist2);
-//        } else {
-//            sum += dxx*dxx;
-//        }
-//    }
-//    R(i,i) = sqrt(sum);
-//    sum = 0;
-//    for(int l =0;l<nDimensions;l++){
-//        dxx = r(i,l); //r[l+i*nDimensions]*r[l+i*nDimensions];
-//        if (l==0) {
-//            sum +=(dxx+dist2)*(dxx+dist2);
-//        } else {
-//            sum += dxx*dxx;
-//        }
-//    }
-//    R(i+1,i) = sqrt(sum);
-//}
-
-
-//double VariationalMC::computePotentialEnergyClosedForm(const mat& R) {
-//    double returnVal = 0.0;
-//    double E1 = 0.0;
-//    returnVal = Z*Z/MolecDist;
-//    // Compute the commutative part of H.
-//    for(int i = 0; i < nParticles; i++) {
-//        returnVal -= Z/R(i,i);
-//        returnVal -= Z/R(i+1,i);
-
-//        for(int j = i+1; j<nParticles; j++) {
-//            E1 += 1/R(i,j);
-//        }
-//    }
-
-//    return returnVal + E1;
-//}
-
-
-/*
- * ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
- * ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
-* ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
-* ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
-* ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
-* ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
-*/
-
-// Choses which wave function to calculate from the int j, then calls the corresponding psi_j. */
+// Choses which wave function to calculate from the int j, then calls the corresponding psi_j.  //FOR MOLECULES
 double VariationalMC::slaterPsi(mat &R, mat &r, int i, int j) {
     double distance = R(i,i);
+    double distance2 = R(i+1,i);
     if (j == 0) {
-        return psi_s1(distance);
+        return psi_s1(distance) + psi_s1(distance2);
     } else if (j == 1) {
-        return psi_s2(distance);
+        return psi_s1(distance) - psi_s1(distance2);
     } else if (j == 2) {
-        return psi_p2x(distance,r,i);
+        return psi_s2(distance) + psi_s2(distance2);
     } else if (j == 3) {
-        return psi_p2y(distance,r,i);
+        return psi_s2(distance) - psi_s2(distance2);
     } else if (j == 4) {
         return psi_p2z(distance,r,i);
     } else {
@@ -1296,39 +1164,54 @@ double VariationalMC::slaterPsi(mat &R, mat &r, int i, int j) {
 }
 
 
-// Choses which wave function to calculate the alpha derivative of from the int
-// j, then calls the corresponding psi_alphaDerivative.
+// Alpha derivatives, MOLECULE EDITION.
 //
-double VariationalMC::slaterAlphaDerivative(int j, double r, const mat coordinates, int i) {
+double VariationalMC::slaterAlphaDerivative(int j, double r, const mat R, int i) {
+    double distance  = R(i,i);
+    double distance2 = R(i+1,i);
+    double R2 = MolecDist/2;
+
     if (j == 0) {
-        return psi_s1_alphaDerivative(r);
+        return psi_s1_alphaDerivative(distance) + psi_s1_alphaDerivative(distance2);
     } else if (j == 1) {
-        return psi_s2_alphaDerivative(r);
+        return psi_s1_alphaDerivative(distance) - psi_s1_alphaDerivative(distance2);
     } else if (j == 2) {
-        return psi_p2x_alphaDerivative(r,coordinates,i);
+        return psi_s2_alphaDerivative(distance) + psi_s2_alphaDerivative(distance2);
     } else if (j == 3) {
-        return psi_p2y_alphaDerivative(r,coordinates,i);
+        return psi_s2_alphaDerivative(distance) - psi_s2_alphaDerivative(distance2);
     } else if (j == 4) {
-        return psi_p2z_alphaDerivative(r,coordinates,i);
+        cout << "Error in slaterAlphaDerivative" << j << endl;
     } else {
         cout << "Error in slaterAlphaDerivative" << j << endl;
     }
 }
 
+
 double VariationalMC::psiDerivative(mat &R, mat &r, int i, int j, int k) {
     double distance = R(i,i);
+    double distance2 = R(i+1,i);
+    double R2 = MolecDist/2;
     if (k == 0) {
-
-        return psi_s1_derivative(distance,r(i,j));
+        if (j==0)
+            return psi_s1_derivative(distance,r(i,j)-R2) + psi_s1_derivative(distance2,r(i,j)+R2);
+        else
+            return psi_s1_derivative(distance,r(i,j)) + psi_s1_derivative(distance2,r(i,j));
 
     } else if (k == 1) {
-        return psi_s2_derivative(distance,r(i,j));
+        if (j==0)
+            return psi_s1_derivative(distance,r(i,j)-R2) - psi_s1_derivative(distance2,r(i,j)+R2);
+        else
+            return psi_s1_derivative(distance,r(i,j)) - psi_s1_derivative(distance2,r(i,j));
     } else if (k == 2) {
-        return psi_p2x_derivative(distance,r,i,j);
+        if (j==0)
+            return psi_s2_derivative(distance,r(i,j)-R2) + psi_s2_derivative(distance2,r(i,j)+R2);
+        else
+            return psi_s2_derivative(distance,r(i,j)) + psi_s2_derivative(distance2,r(i,j));
     } else if (k == 3) {
-        return psi_p2y_derivative(distance,r,i,j);
-    } else if (k == 4) {
-        return psi_p2z_derivative(distance,r,i,j);
+        if (j==0)
+            return psi_s2_derivative(distance,r(i,j)-R2) - psi_s2_derivative(distance2,r(i,j)+R2);
+        else
+            return psi_s2_derivative(distance,r(i,j)) - psi_s2_derivative(distance2,r(i,j));
     } else {
         return 0;
         cout << "Error in psiDerivative: k = " << k  << endl;
@@ -1337,17 +1220,15 @@ double VariationalMC::psiDerivative(mat &R, mat &r, int i, int j, int k) {
 
 double VariationalMC::psiDoubleDerivative(mat &R, mat &r, int i, int j) {
     double distance = R(i,i);
-
+    double distance2 = R(i+1,i);
     if (j == 0) {
-        return psi_s1_doubleDerivative(distance);
+        return psi_s1_doubleDerivative(distance) + psi_s1_doubleDerivative(distance2);
     } else if (j == 1) {
-        return psi_s2_doubleDerivative(distance);
+        return psi_s1_doubleDerivative(distance) - psi_s1_doubleDerivative(distance2);
     } else if (j == 2) {
-        return psi_p2x_doubleDerivative(distance,r,i);
+        return psi_s2_doubleDerivative(distance) + psi_s2_doubleDerivative(distance2);
     } else if (j == 3) {
-        return psi_p2y_doubleDerivative(distance,r,i);
-    } else if (j == 4) {
-        return psi_p2z_doubleDerivative(distance,r,i);
+        return psi_s2_doubleDerivative(distance) - psi_s2_doubleDerivative(distance2);
     } else {
         return 0;
         cout << "Error in psiDoubleDerivative: j = " <<  j  << endl;
@@ -1356,10 +1237,12 @@ double VariationalMC::psiDoubleDerivative(mat &R, mat &r, int i, int j) {
 
 
 // Updates the distance matrix when we have just changed one coordinate of particle "i"
-// (like we do when computing the derivative)*/
-void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
+// (like we do when computing the derivative)
 
+//version for calculating molecules
+void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
     double dxx, sum;
+    double dist2 = MolecDist/2.0;
     for(int k=0; k<i; k++) {
         sum = 0;
         for(int l =0;l<nDimensions;l++){
@@ -1381,17 +1264,34 @@ void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
     sum = 0;
     for(int l =0;l<nDimensions;l++){
         dxx = r(i,l); //r[l+i*nDimensions]*r[l+i*nDimensions];
-        sum += dxx*dxx;
+        if (l==0) {
+            sum +=(dxx-dist2)*(dxx-dist2);
+        } else {
+            sum += dxx*dxx;
+        }
     }
     R(i,i) = sqrt(sum);
+    sum = 0;
+    for(int l =0;l<nDimensions;l++){
+        dxx = r(i,l); //r[l+i*nDimensions]*r[l+i*nDimensions];
+        if (l==0) {
+            sum +=(dxx+dist2)*(dxx+dist2);
+        } else {
+            sum += dxx*dxx;
+        }
+    }
+    R(i+1,i) = sqrt(sum);
 }
+
 
 double VariationalMC::computePotentialEnergyClosedForm(const mat& R) {
     double returnVal = 0.0;
     double E1 = 0.0;
+    returnVal = Z*Z/MolecDist;
     // Compute the commutative part of H.
     for(int i = 0; i < nParticles; i++) {
         returnVal -= Z/R(i,i);
+        returnVal -= Z/R(i+1,i);
 
         for(int j = i+1; j<nParticles; j++) {
             E1 += 1/R(i,j);
@@ -1400,3 +1300,138 @@ double VariationalMC::computePotentialEnergyClosedForm(const mat& R) {
 
     return returnVal + E1;
 }
+
+
+///*
+// * ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
+// * ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
+//* ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
+//* ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
+//* ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
+//* ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT ATOM SHIT
+//*/
+
+//// Choses which wave function to calculate from the int j, then calls the corresponding psi_j. */
+//double VariationalMC::slaterPsi(mat &R, mat &r, int i, int j) {
+//    double distance = R(i,i);
+//    if (j == 0) {
+//        return psi_s1(distance);
+//    } else if (j == 1) {
+//        return psi_s2(distance);
+//    } else if (j == 2) {
+//        return psi_p2x(distance,r,i);
+//    } else if (j == 3) {
+//        return psi_p2y(distance,r,i);
+//    } else if (j == 4) {
+//        return psi_p2z(distance,r,i);
+//    } else {
+//        return 0;
+//        cout << "Error in slaterPsi" << j<< endl;
+//    }
+//}
+
+
+//// Choses which wave function to calculate the alpha derivative of from the int
+//// j, then calls the corresponding psi_alphaDerivative.
+////
+//double VariationalMC::slaterAlphaDerivative(int j, double r, const mat coordinates, int i) {
+//    if (j == 0) {
+//        return psi_s1_alphaDerivative(r);
+//    } else if (j == 1) {
+//        return psi_s2_alphaDerivative(r);
+//    } else if (j == 2) {
+//        return psi_p2x_alphaDerivative(r,coordinates,i);
+//    } else if (j == 3) {
+//        return psi_p2y_alphaDerivative(r,coordinates,i);
+//    } else if (j == 4) {
+//        return psi_p2z_alphaDerivative(r,coordinates,i);
+//    } else {
+//        cout << "Error in slaterAlphaDerivative" << j << endl;
+//    }
+//}
+
+//double VariationalMC::psiDerivative(mat &R, mat &r, int i, int j, int k) {
+//    double distance = R(i,i);
+//    if (k == 0) {
+
+//        return psi_s1_derivative(distance,r(i,j));
+
+//    } else if (k == 1) {
+//        return psi_s2_derivative(distance,r(i,j));
+//    } else if (k == 2) {
+//        return psi_p2x_derivative(distance,r,i,j);
+//    } else if (k == 3) {
+//        return psi_p2y_derivative(distance,r,i,j);
+//    } else if (k == 4) {
+//        return psi_p2z_derivative(distance,r,i,j);
+//    } else {
+//        return 0;
+//        cout << "Error in psiDerivative: k = " << k  << endl;
+//    }
+//}
+
+//double VariationalMC::psiDoubleDerivative(mat &R, mat &r, int i, int j) {
+//    double distance = R(i,i);
+
+//    if (j == 0) {
+//        return psi_s1_doubleDerivative(distance);
+//    } else if (j == 1) {
+//        return psi_s2_doubleDerivative(distance);
+//    } else if (j == 2) {
+//        return psi_p2x_doubleDerivative(distance,r,i);
+//    } else if (j == 3) {
+//        return psi_p2y_doubleDerivative(distance,r,i);
+//    } else if (j == 4) {
+//        return psi_p2z_doubleDerivative(distance,r,i);
+//    } else {
+//        return 0;
+//        cout << "Error in psiDoubleDerivative: j = " <<  j  << endl;
+//    }
+//}
+
+
+//// Updates the distance matrix when we have just changed one coordinate of particle "i"
+//// (like we do when computing the derivative)*/
+//void VariationalMC::updateForDerivative(mat &R, const mat &r, int i){
+
+//    double dxx, sum;
+//    for(int k=0; k<i; k++) {
+//        sum = 0;
+//        for(int l =0;l<nDimensions;l++){
+//            dxx = r(i,l) - r(k,l);
+//            sum += dxx*dxx;
+//        }
+//        R(k,i) = sqrt(sum); //R is the matrix of distances
+//    }
+
+//    for(int k=i+1;k<nParticles;k++){
+//        sum = 0;
+//        for(int l =0;l<nDimensions;l++){
+//            dxx = r(i,l) - r(k,l);;
+//            sum += dxx*dxx;
+//        }
+//        R(i,k) = sqrt(sum); //R is the matrix of distances
+//    }
+
+//    sum = 0;
+//    for(int l =0;l<nDimensions;l++){
+//        dxx = r(i,l); //r[l+i*nDimensions]*r[l+i*nDimensions];
+//        sum += dxx*dxx;
+//    }
+//    R(i,i) = sqrt(sum);
+//}
+
+//double VariationalMC::computePotentialEnergyClosedForm(const mat& R) {
+//    double returnVal = 0.0;
+//    double E1 = 0.0;
+//    // Compute the commutative part of H.
+//    for(int i = 0; i < nParticles; i++) {
+//        returnVal -= Z/R(i,i);
+
+//        for(int j = i+1; j<nParticles; j++) {
+//            E1 += 1/R(i,j);
+//        }
+//    }
+
+//    return returnVal + E1;
+//}

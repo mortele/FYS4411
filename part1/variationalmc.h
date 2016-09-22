@@ -28,6 +28,31 @@ class VariationalMC {
         vec     dx;
         mat     spins;
         bool    isMolecule;
+        bool    firstSetup = true;
+
+        arma::mat correlationsOld    ;
+        arma::mat correlationsNew    ;
+        arma::mat coordinatesNew     ;
+        arma::mat coordinatesOld     ;
+        arma::mat Rnew               ;
+        arma::mat Rold               ;
+        arma::mat slaterOldUp        ;
+        arma::mat slaterOldDown      ;
+        arma::mat slaterNewUp        ;
+        arma::mat slaterNewDown      ;
+        arma::mat slaterGradient     ;
+        arma::mat slaterGradientOld  ;
+        arma::mat jastrowGradient    ;
+        arma::mat jastrowGradientOld ;
+        arma::mat jastrowLaplacian   ;
+        arma::mat jastrowLaplacianOld;
+        arma::mat quantumForceOld    ;
+        arma::mat quantumForceNew    ;
+        arma::mat variationalGrad    ;
+        arma::mat variationalGradE   ;
+        arma::mat variationalGradSum ;
+        arma::mat variationalGradESum;
+
 
 
         double  computePsi(const mat&);
@@ -85,7 +110,9 @@ class VariationalMC {
         double  psi_p2x_doubleDerivative(double distance, mat &r, int i);
     public:
         VariationalMC();
-        vec runMetropolis(double, double, int);
+        vec runMetropolis(double, double);
+        void setMolecularDistance(double R);
+        void setNumberOfMonteCarloCycles(int n);
 };
 
 #endif // VARIATIONALMC_H

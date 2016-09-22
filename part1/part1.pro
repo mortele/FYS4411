@@ -5,8 +5,8 @@ CONFIG -= qt
 
 SOURCES += main.cpp \
     variationalmc.cpp\
-    variationalloop.cpp \
-    ../../../../Comp/Project 2/jacobi.cpp
+    variationalloop.cpp
+#    ../../../../Comp/Project 2/jacobi.cpp
 
 HEADERS += \
     variationalmc.h \
@@ -23,16 +23,17 @@ release {
     QMAKE_CXXFLAGS_RELEASE -= -O2
     QMAKE_CXXFLAGS_RELEASE += -O3
 }
-LIBS+= -larmadillo -lblas -llapack
+INCLUDEPATH += /usr/local/include
+LIBS +=  -L/usr/local/lib -llapack -lblas -larmadillo
 
 # MPI Settings
-QMAKE_CXX = mpicxx
-QMAKE_CXX_RELEASE = $$QMAKE_CXX
-QMAKE_CXX_DEBUG = $$QMAKE_CXX
-QMAKE_LINK = $$QMAKE_CXX
-QMAKE_CC = mpicc
-
-QMAKE_CFLAGS += $$system(mpicc --showme:compile)
-QMAKE_LFLAGS += $$system(mpicxx --showme:link)
-QMAKE_CXXFLAGS += $$system(mpicxx --showme:compile) -DMPICH_IGNORE_CXX_SEEK
-QMAKE_CXXFLAGS_RELEASE += $$system(mpicxx --showme:compile) -DMPICH_IGNORE_CXX_SEEK
+#QMAKE_CXX = mpicxx
+#QMAKE_CXX_RELEASE = $$QMAKE_CXX
+#QMAKE_CXX_DEBUG = $$QMAKE_CXX
+#QMAKE_LINK = $$QMAKE_CXX
+#QMAKE_CC = mpicc
+#
+#QMAKE_CFLAGS += $$system(mpicc --showme:compile)
+#QMAKE_LFLAGS += $$system(mpicxx --showme:link)
+#QMAKE_CXXFLAGS += $$system(mpicxx --showme:compile) -DMPICH_IGNORE_CXX_SEEK
+#QMAKE_CXXFLAGS_RELEASE += $$system(mpicxx --showme:compile) -DMPICH_IGNORE_CXX_SEEK
