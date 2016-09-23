@@ -15,7 +15,7 @@ using namespace arma;
 
 int main(int argc, char* argv[]) {
 
-    int n   = 100;
+    int n   = 1;
     vec R   = zeros<vec>(n);
     double Rmin = 0.8;
     double Rmax = 6.0;
@@ -36,9 +36,9 @@ int main(int argc, char* argv[]) {
     */
     double  alpha       = 1.0;
     double  beta        = 1.0;
-    int     cyclesFirst = 10;
+    int     cyclesFirst = 1;
     int     cycles      = 10;
-    int     MCCyclesFirst   = (int) 5e6;
+    int     MCCyclesFirst   = (int) 1e6;
     int     MCCycles        = (int) 5e6;
 
     VariationalLoop loop;
