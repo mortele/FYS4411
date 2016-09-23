@@ -15,10 +15,10 @@ using namespace arma;
 
 int main(int argc, char* argv[]) {
 
-    int n   = 100;
+    int n   = 150;
     vec R   = zeros<vec>(n);
-    double Rmin = 0.8;
-    double Rmax = 6.0;
+    double Rmin = 3.5;
+    double Rmax = 4.5;
     double h    = (Rmax - Rmin) / (n - 1);
 
 
@@ -36,16 +36,16 @@ int main(int argc, char* argv[]) {
     */
     double  alpha       = 1.0;
     double  beta        = 1.0;
-    int     cyclesFirst = 10;
-    int     cycles      = 10;
-    int     MCCyclesFirst   = (int) 5e6;
-    int     MCCycles        = (int) 5e6;
+    int     cyclesFirst = 50;
+    int     cycles      = 20;
+    int     MCCyclesFirst   = (int) 1e7;
+    int     MCCycles        = (int) 1e7;
 
     VariationalLoop loop;
     loop.setAlphaBeta(alpha, beta);
 
     ofstream outFile;
-    outFile.open("VMCData.dat", ios::out);
+    outFile.open("VMCData35-45.dat", ios::out);
 
     for (int i=0; i < n; i++) {
 
